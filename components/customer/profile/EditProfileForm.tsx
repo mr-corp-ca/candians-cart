@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState, useCallback } from "react";
+import { useActionState, useEffect, useState, useCallback, useTransition  } from "react";
 import {
   editUserProfile,
   type ProfileState,
@@ -19,6 +19,7 @@ import {
   Check,
   ChevronLeft,
   Clock,
+  KeyRoundIcon,
 } from "lucide-react";
 import { Customer } from "@/types/customer/customer";
 import Link from "next/link";
@@ -116,12 +117,14 @@ function IconSelect({
 }
 
 export default function EditProfileForm({ user }: { user: FormUserData }) {
-  const [state, formAction, isPending] = useActionState(
-    editUserProfile,
-    initialState,
-  );
+  // const [state, formAction, isPending] = useActionState(
+  //   editUserProfile,
+  //   initialState,
+  // );
+  const [state, formAction] = useActionState(editUserProfile, initialState);
+  const [isPending, startTransition] = useTransition();
 
-  const router = useRouter()
+  const router = useRouter();
 
   // Trim all incoming backend values once
   const trimmed: FormUserData = {
@@ -134,18 +137,70 @@ export default function EditProfileForm({ user }: { user: FormUserData }) {
   };
 
   // Controlled state for editable fields (trimmed originals as baseline)
+  // const [fields, setFields] = useState<EditableFields>({
+  //   name: trimmed.name,
+  //   address: trimmed.address,
+  //   city: trimmed.city,
+  //   province: trimmed.province || "BC",
+  //   mobile: trimmed.mobile,
+  // });
+
+  const formatMobile = (val: string) => {
+    const digits = val.replace(/\D/g, "").slice(0, 10);
+    if (digits.length >= 7)
+      return `(${digits.slice(0, 3)})${digits.slice(3, 6)}-${digits.slice(6)}`;
+    if (digits.length >= 4) return `(${digits.slice(0, 3)})${digits.slice(3)}`;
+    if (digits.length >= 1) return `(${digits}`;
+    return digits;
+  };
+
   const [fields, setFields] = useState<EditableFields>({
     name: trimmed.name,
     address: trimmed.address,
     city: trimmed.city,
     province: trimmed.province || "BC",
-    mobile: trimmed.mobile,
+    mobile: formatMobile(trimmed.mobile),
   });
 
   // Unified handler for both input and select elements
+  // const handleChange = useCallback(
+  //   (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  //     const { name, value } = e.target;
+  //     setFields((prev) => ({ ...prev, [name]: value }));
+  //   },
+  //   [],
+  // );
+  //   const handleChange = useCallback(
+  //   (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  //     const { name, value } = e.target;
+
+  //     if (name === "mobile") {
+  //       const digits = value.replace(/\D/g, "").slice(0, 10);
+  //       let formatted = digits;
+  //       if (digits.length >= 7) {
+  //         formatted = `(${digits.slice(0, 3)})${digits.slice(3, 6)}-${digits.slice(6)}`;
+  //       } else if (digits.length >= 4) {
+  //         formatted = `(${digits.slice(0, 3)})${digits.slice(3)}`;
+  //       } else if (digits.length >= 1) {
+  //         formatted = `(${digits}`;
+  //       }
+  //       setFields((prev) => ({ ...prev, mobile: formatted }));
+  //       return;
+  //     }
+
+  //     setFields((prev) => ({ ...prev, [name]: value }));
+  //   },
+  //   [],
+  // );
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
       const { name, value } = e.target;
+
+      if (name === "mobile") {
+        setFields((prev) => ({ ...prev, mobile: formatMobile(value) }));
+        return;
+      }
+
       setFields((prev) => ({ ...prev, [name]: value }));
     },
     [],
@@ -161,11 +216,10 @@ export default function EditProfileForm({ user }: { user: FormUserData }) {
 
   useEffect(() => {
     if (state.message) {
-      if (state.success){
+      if (state.success) {
         toast.success(state.message);
-        router.push("/customer/profile")
-      } 
-      else toast.error(state.message);
+        router.push("/customer/profile");
+      } else toast.error(state.message);
     }
   }, [state]);
 
@@ -182,7 +236,8 @@ export default function EditProfileForm({ user }: { user: FormUserData }) {
       (Object.keys(fields) as (keyof EditableFields)[]).forEach((key) => {
         fd.set(key, (fields[key] ?? "").trim());
       });
-      formAction(fd);
+      // formAction(fd);
+      startTransition(() => formAction(fd));
     },
     [fields, hasChanges, formAction],
   );
@@ -233,10 +288,31 @@ export default function EditProfileForm({ user }: { user: FormUserData }) {
                     disabled
                     className="pl-10 h-11 rounded-xl border-border/40 bg-secondary/40 text-muted-foreground cursor-not-allowed"
                   />
-                  <Link className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[9px] font-bold uppercase tracking-widest text-white bg-primary px-2 py-1 rounded-full" href={"/customer/change-email"}>Change email</Link>  
+                  <Link
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[9px] font-bold uppercase tracking-widest text-white bg-primary px-2 py-1 rounded-full"
+                    href={"/customer/change-email"}
+                  >
+                    Change email
+                  </Link>
+                </div>
+
+                <FieldLabel>Password</FieldLabel>
+                <div className="relative">
+                  <KeyRoundIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/30 pointer-events-none" />
+                  <Input
+                    type="password"
+                    defaultValue={"This is a Password"}
+                    disabled
+                    className="pl-10 h-11 rounded-xl border-border/40 bg-secondary/40 text-muted-foreground cursor-not-allowed"
+                  />
+                  <Link
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[9px] font-bold uppercase tracking-widest text-white bg-primary px-2 py-1 rounded-full"
+                    href={"/customer/change-password"}
+                  >
+                    Change Password
+                  </Link>
                 </div>
               </div>
-              
 
               {/* Personal */}
               <div className="px-6 py-5 space-y-4">
@@ -262,9 +338,9 @@ export default function EditProfileForm({ user }: { user: FormUserData }) {
                     type="tel"
                     value={fields.mobile}
                     onChange={handleChange}
-                    maxLength={10}
+                    maxLength={14}
                     required
-                    placeholder="6041234567"
+                    placeholder="(604)123-4567"
                     className="font-mono tracking-wider"
                     error={state?.errors?.mobile?.[0]}
                   />
@@ -418,7 +494,6 @@ export default function EditProfileForm({ user }: { user: FormUserData }) {
                 <p className="text-xs text-muted-foreground mt-1 truncate">
                   {trimmed.email}
                 </p>
-                
               </div>
             </div>
 
@@ -434,7 +509,28 @@ export default function EditProfileForm({ user }: { user: FormUserData }) {
                     disabled
                     className="pl-10 h-11 rounded-xl border-border/40 bg-secondary/40 text-muted-foreground cursor-not-allowed"
                   />
-                  <Link className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[9px] font-bold uppercase tracking-widest text-white bg-primary px-2 py-1 rounded-full" href={"/customer/change-email"}>Change email</Link>
+                  <Link
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[9px] font-bold uppercase tracking-widest text-white bg-primary px-2 py-1 rounded-full"
+                    href={"/customer/change-email"}
+                  >
+                    Change email
+                  </Link>
+                </div>
+                <FieldLabel>Password</FieldLabel>
+                <div className="relative">
+                  <KeyRoundIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/30 pointer-events-none" />
+                  <Input
+                    type="password"
+                    defaultValue={"This is a Password"}
+                    disabled
+                    className="pl-10 h-11 rounded-xl border-border/40 bg-secondary/40 text-muted-foreground cursor-not-allowed"
+                  />
+                  <Link
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[9px] font-bold uppercase tracking-widest text-white bg-primary px-2 py-1 rounded-full"
+                    href={"/customer/change-password"}
+                  >
+                    Change Password
+                  </Link>
                 </div>
               </div>
 
@@ -462,9 +558,9 @@ export default function EditProfileForm({ user }: { user: FormUserData }) {
                     type="tel"
                     value={fields.mobile}
                     onChange={handleChange}
-                    maxLength={10}
+                    maxLength={13}
                     required
-                    placeholder="6041234567"
+                    placeholder="(604)123-4567"
                     className="font-mono tracking-wider"
                     error={state?.errors?.mobile?.[0]}
                   />
@@ -519,7 +615,6 @@ export default function EditProfileForm({ user }: { user: FormUserData }) {
                       error={state?.errors?.province?.[0]}
                     >
                       <option value="BC">British Columbia (BC)</option>
-
                     </IconSelect>
                   </div>
                 </div>

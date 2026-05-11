@@ -5,16 +5,32 @@ import Link from "next/link";
 import { getCustomerDataAction } from "@/actions/customer/User.action";
 import { Customer } from "@/types/customer/customer";
 import { getCartItemsCount } from "@/actions/customer/ProductAndStore/Cart.Action";
-import { fmtShort } from "@/lib/fomatPrice";
 import { NavAvatarMenu } from "./NavMenu";
+import { getCustomerNotifications, getUnreadNotificationCount } from "@/actions/common/notification.action";
+import { NotificationDropdown } from "../notification/NotificationDropdown";
+
+// NEW IMPORTS
+// import { getCustomerNotifications, getUnreadNotificationCount } from "@/actions/notification"; // Adjust path
+// import { NotificationDropdown } from "./NotificationDropdown"; 
 
 const Navbar = async () => {
-  const [customerDataResponse, cartCount] = await Promise.all([
+  // Add the notification fetches to your Promise.all
+  const [
+    customerDataResponse, 
+    cartCount,
+    unreadCountResponse,
+    notificationsResponse
+  ] = await Promise.all([
     getCustomerDataAction(),
     getCartItemsCount(),
+    getUnreadNotificationCount(),
+    getCustomerNotifications(),
   ]);
 
   const customerData: Customer = customerDataResponse.customerData;
+  const unreadCount = unreadCountResponse.count ?? 0;
+  const notifications = notificationsResponse.data ?? [];
+
   const initials = customerData.name
     .split(" ")
     .map((w) => w[0])
@@ -28,7 +44,7 @@ const Navbar = async () => {
         
         {/* Logo */}
         <div className="shrink-0 flex items-center h-full">
-          <Logo />
+          <Logo variant="icon" />
         </div>
 
         {/* Search — tablet+ */}
@@ -44,6 +60,12 @@ const Navbar = async () => {
 
         {/* Right actions */}
         <div className="flex items-center gap-2 shrink-0">
+
+    {/* Notifications Dropdown (Replaced Link block) */}
+          <NotificationDropdown 
+            unreadCount={unreadCount} 
+            notifications={notifications} 
+          />          
           
           {/* Cart */}
           <Link href="/customer/cart">
@@ -77,8 +99,13 @@ const Navbar = async () => {
           {/* Divider */}
           <div className="w-px h-5 bg-border mx-1" />
 
+          
+
+
           {/* Avatar dropdown */}
           <NavAvatarMenu name={customerData.name} initials={initials} />
+
+          
         </div>
       </div>
     </nav>

@@ -11,6 +11,7 @@ import {
   Receipt,
   ShoppingCart,
   Store,
+  UserRoundPen,
   Users2,
   X,
 } from "lucide-react";
@@ -37,6 +38,7 @@ const NAV_GROUPS = [
       { href: "/store/products", label: "Products", icon: Package },
       { href: "/store/subsidy-list", label: "Subsidy List", icon: List },
       { href: "/store/customers", label: "Customers", icon: Users2 },
+      { href: "/store/profile", label: "Profile", icon: UserRoundPen },
     ],
   },
   {
@@ -139,7 +141,7 @@ function SidebarContent({ onNav, name }: { onNav?: () => void; name: string }) {
         >
           <Avatar className="h-8 w-8 shrink-0">
             <AvatarImage 
-            src={`https://api.dicebear.com/9.x/lorelei/svg?seed=${encodeURIComponent(name?name : "User")}`}
+            src={`https://api.dicebear.com/9.x/thumbs/svg?seed=${encodeURIComponent(name?name : "User")}`}
             />
             <AvatarFallback className="text-xs bg-emerald-100 text-emerald-700 font-semibold">
               JK
@@ -189,7 +191,7 @@ const AdminSidebar = ({ name }: StoreSidebarProps) => {
         <div className="flex items-center gap-2.5 px-5 py-4 border-b border-gray-50 shrink-0">
           <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0">
             {/* <Store className="w-4 h-4 text-white" /> */}
-            <Logo />
+            <Logo variant="icon" />
           </div>
           <span className="text-[15px] font-bold text-gray-900 tracking-tight">
             Store Panel
@@ -213,7 +215,7 @@ const AdminSidebar = ({ name }: StoreSidebarProps) => {
         </button>
         <div className="flex items-center gap-2.5">
           <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0">
-            <Logo />
+            <Logo variant="icon" />
           </div>
           <span className="text-sm font-bold text-gray-900">Store Panel</span>
         </div>
@@ -242,7 +244,7 @@ const AdminSidebar = ({ name }: StoreSidebarProps) => {
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-xl flex items-center justify-center">
               {/* <Store className="w-4 h-4 text-white" /> */}
-              <Logo />
+              <Logo variant="icon" />
             </div>
             <span className="text-[15px] font-bold text-gray-900">
               Store Panel
