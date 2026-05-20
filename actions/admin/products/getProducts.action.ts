@@ -22,6 +22,8 @@ export interface AdminProduct {
   InvoiceId?: string;
   createdAt: string;
   updatedAt: string;
+  UOM: string;
+  isMeasuredInWeight: Boolean;
   images?: {
     url: string;
     fileId: string;
@@ -116,7 +118,7 @@ const getPaginatedProductsCached = (
       };
     },
     [cacheKey],
-    { revalidate: 3600, tags: cacheTags },
+    { revalidate: 86400, tags: cacheTags }, // Rebuild after ecvery 24 hr
   );
 };
 
@@ -154,7 +156,7 @@ const getSearchProductsCached = (query: string, storeId?: string | null) => {
       return data.map(serializeProduct);
     },
     [cacheKey],
-    { revalidate: 3600, tags: cacheTags },
+    { revalidate: 86400, tags: cacheTags }, // Rebuild after ecvery 24 hr
   );
 };
 

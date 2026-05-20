@@ -24,7 +24,7 @@ export interface PaginatedProductsResponse {
 }
 
 /**
- * Highly optimized caching layer for Candian's Cart products.
+ * Highly optimized caching layer for Canadian's Cart products.
  * Uses next/cache unstable_cache to persist results across requests.
  * Executes query and count in parallel to eliminate waterfalls.
  */
@@ -83,8 +83,8 @@ export const getCachedStoreProducts = async (
     },
     [cacheKey], // dependencies for cache invalidation
     {
-      revalidate: 3600, // revalidate after every hour
-      tags: [`products-${storeId}`], // tag for manual invalidation when products change
+      revalidate: 86400, // revalidate after 24 hr
+      tags: [`products-${storeId}`, "global-products"], // tag for manual invalidation when products change
     },
   );
 
