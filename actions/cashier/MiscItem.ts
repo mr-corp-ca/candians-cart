@@ -16,6 +16,7 @@ interface MiscItemFormData {
   primaryUPC?: string;
   price: number;
   quantity: number;
+  tax:number;
 }
 
 interface ProductFormData {
@@ -54,6 +55,7 @@ export const createMiscProduct = async (data: MiscItemFormData, customerId: stri
             price: data.price,
             productName: data.productName,
             primaryUPC: UPC,
+            tax: data.tax,
         });
         if (!MiscProduct) return { success: false, message: "Error creating Misc product" };
 
@@ -68,6 +70,7 @@ export const createMiscProduct = async (data: MiscItemFormData, customerId: stri
                         itemId: MiscProduct._id,
                         quantity: data.quantity,
                         priceAtAdd: MiscProduct.price,
+                        taxAtAdd:MiscProduct.tax,
                     },
                 },
             }
@@ -191,18 +194,22 @@ const MiscProductSchema = z.object({
     .max(18)
     .transform((val) => (val === "" ? undefined : val.toUpperCase()))
     .optional(),
+  images: z.array(z.object({
+  url: z.string(),
+  fileId: z.string().optional(),
+})).optional().default([]),
 });
 
 type MiscProductPayload = z.input<typeof MiscProductSchema>;
 
-export const createProductFromMisc = async (data: MiscProductPayload,miscId:string) => {
+export const createProductFromMisc = async (data: MiscProductPayload, miscId: string) => {
   if (!data || !miscId) return { success: false, message: "No data provided" };
 
   try {
     const session = await getUserSession();
     if (!session?.user?.id) return { success: false, message: "Unauthorized" };
 
-    const parsed = MiscProductSchema.safeParse(data);createMiscProduct
+    const parsed = MiscProductSchema.safeParse(data);
     if (!parsed.success) {
       const message = parsed.error.issues.map((e: z.ZodIssue) => e.message).join(", ");
       return { success: false, message };
@@ -245,9 +252,9 @@ export const createProductFromMisc = async (data: MiscProductPayload,miscId:stri
       description,
       category,
       markup,
-      tax,           
-      disposableFee, 
-      price,         
+      tax,
+      disposableFee,
+      price,
       stock,
       subsidised: isSubsidized,
       isFeatured,
@@ -255,7 +262,7 @@ export const createProductFromMisc = async (data: MiscProductPayload,miscId:stri
       UOM,
       PriceDrop,
       storeId,
-      images: [],
+      images: parsed.data.images ?? [],
     };
 
     if (primaryUPC) dbPayload.primaryUPC = primaryUPC;
@@ -275,9 +282,12 @@ export const createProductFromMisc = async (data: MiscProductPayload,miscId:stri
       await mongoSession.endSession();
     }
 
-    // change misc product item
-
-    await MiscellaneousItemsModel.findByIdAndUpdate(miscId,{isAdded:true,productId:createdProductId})
+    await MiscellaneousItemsModel.findByIdAndUpdate(miscId, {
+      isAdded: true,
+      productId: createdProductId,
+      tax,
+      price,  
+    });
 
     revalidateTag(`products-${storeId}`, "max");
     revalidatePath("/cashier/misc-items");
