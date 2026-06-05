@@ -37,7 +37,7 @@ interface MiscItem {
   productName: string;
   primaryUPC?: string;
   price: number;
-  tax:number;
+  tax: number;
   createdAt: string;
 }
 
@@ -47,6 +47,7 @@ interface ProductFormData {
   name: string;
   primaryUPC: string;
   price: string;
+  finalPrice: string;
   description: string;
   category: string;
   markup: string;
@@ -77,11 +78,12 @@ function buildDefaultForm(item: MiscItem): ProductFormData {
     miscItemId: item._id,
     name: item.productName,
     primaryUPC: item.primaryUPC?.trim() ?? "",
-    price: (item.price / 100).toFixed(2),
+    price: "",
+finalPrice: (item.price / 100).toFixed(2),
     description: "",
     category: "",
     markup: "",
-     tax: String(item.tax ?? 0.05),
+    tax: String(item.tax ?? 0.05),
     disposableFee: "",
     stock: true,
     subsidised: false,
@@ -241,6 +243,39 @@ export default function NewProductPage() {
     if (formErrors[key]) setFormErrors((prev) => ({ ...prev, [key]: undefined }));
   }
 
+  // ── three-way price/markup/finalPrice calculation ──
+  // Called onBlur after the user finishes typing in any of the three fields.
+  // Whichever two are filled in, the third is derived.
+  function calcMissing(changed: "price" | "markup" | "finalPrice") {
+    if (!form) return;
+
+    const price = parseFloat(form.price);
+    const markup = parseFloat(form.markup);
+    const finalPrice = parseFloat(form.finalPrice);
+
+    const hasPrice = !isNaN(price) && price > 0;
+    const hasMarkup = !isNaN(markup) && markup >= 0;
+    const hasFinal = !isNaN(finalPrice) && finalPrice > 0;
+
+    if (changed === "price" || changed === "markup") {
+      // base price + markup → compute final price
+      if (hasPrice && hasMarkup) {
+        const computed = (price * (1 + markup / 100)).toFixed(2);
+        setForm((prev) => (prev ? { ...prev, finalPrice: computed } : prev));
+      }
+    } else if (changed === "finalPrice") {
+      if (hasFinal && hasPrice) {
+        // base price + final price → compute markup %
+        const computed = (((finalPrice - price) / price) * 100).toFixed(2);
+        setForm((prev) => (prev ? { ...prev, markup: computed } : prev));
+      } else if (hasFinal && hasMarkup) {
+        // final price + markup → compute base price
+        const computed = (finalPrice / (1 + markup / 100)).toFixed(2);
+        setForm((prev) => (prev ? { ...prev, price: computed } : prev));
+      }
+    }
+  }
+
   function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -264,8 +299,12 @@ export default function NewProductPage() {
     if (!form!.category) next.category = "Category is required";
     const markup = parseFloat(form!.markup);
     if (!form!.markup || isNaN(markup) || markup < 0) next.markup = "Enter a valid markup %";
-    const price = parseFloat(form!.price);
-    if (!form!.price || isNaN(price) || price <= 0) next.price = "Price must be greater than zero";
+const price = parseFloat(form!.price);
+const finalPrice = parseFloat(form!.finalPrice);
+
+if ((!form!.price || isNaN(price) || price <= 0) && (!form!.finalPrice || isNaN(finalPrice) || finalPrice <= 0)) {
+  next.price = "Enter either base price or final price";
+}
     if (form!.isMeasuredInWeight && !form!.UOM.trim()) next.UOM = "Unit of measurement is required when measured by weight";
 
     setFormErrors(next);
@@ -305,7 +344,7 @@ export default function NewProductPage() {
         markup: parseFloat(form!.markup),
         tax: parseFloat(form!.tax),
         disposableFee: form!.disposableFee ? Math.round(parseFloat(form!.disposableFee) * 100) : 0,
-        price: Math.round(parseFloat(form!.price) * 100),
+        price: Math.round(parseFloat(form!.finalPrice || form!.price) * 100),
         stock: form!.stock,
         subsidised: form!.subsidised,
         isFeatured: form!.isFeatured,
@@ -436,13 +475,15 @@ export default function NewProductPage() {
               </Field>
             </div>
 
-            <Field label="Base Price (CAD)" required error={formErrors.price}>
+            {/* ── three-way pricing block ── */}
+            <Field label="Base Price (CAD)" required error={formErrors.price} hint="auto-calculated if empty">
               <div className="relative">
                 <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-medium text-muted-foreground">$</span>
                 <Input
                   className={`pl-7 ${formErrors.price ? "border-destructive" : ""}`}
                   value={form.price}
                   onChange={(e) => set("price", e.target.value)}
+                  onBlur={() => calcMissing("price")}
                   type="number"
                   min="0.01"
                   step="0.01"
@@ -451,18 +492,50 @@ export default function NewProductPage() {
               </div>
             </Field>
 
+            <Field label="Markup %" required error={formErrors.markup} hint="auto-calculated if empty">
+              <div className="relative">
+                <Input
+                  className={`pr-7 ${formErrors.markup ? "border-destructive" : ""}`}
+                  value={form.markup}
+                  onChange={(e) => set("markup", e.target.value)}
+                  onBlur={() => calcMissing("markup")}
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="e.g. 55.68"
+                />
+                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm font-medium text-muted-foreground">%</span>
+              </div>
+            </Field>
+
+            <div className="sm:col-span-2">
+              <Field label="Final Price (CAD)" hint="after markup · auto-calculated if empty">
+                <div className="relative">
+                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-medium text-muted-foreground">$</span>
+                  <Input
+                    className="pl-7 border-primary/40 bg-primary/[0.02] focus-visible:ring-primary/30"
+                    value={form.finalPrice ?? ""}
+                    onChange={(e) => set("finalPrice", e.target.value)}
+                    onBlur={() => calcMissing("finalPrice")}
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    placeholder="0.00"
+                  />
+                </div>
+                <p className="text-[11px] text-muted-foreground/70 mt-1">
+                  Fill any two fields — the third is calculated automatically on blur.
+                </p>
+              </Field>
+            </div>
+            {/* ── end three-way pricing block ── */}
+
             <Field label="Primary UPC" hint="Optional · editable">
               <Input
                 value={form.primaryUPC}
-                onChange={(e) => set("primaryUPC", e.target.value.replace(/\D/g, ""))}
-                onKeyDown={(e) => {
-                  if (!/[\d\b]/.test(e.key) && !["Backspace", "Delete", "ArrowLeft", "ArrowRight", "Tab"].includes(e.key)) {
-                    e.preventDefault();
-                  }
-                }}
+                onChange={(e) => set("primaryUPC", e.target.value)}
                 placeholder="Barcode / UPC"
                 className="font-mono text-sm tracking-wider"
-                inputMode="numeric"
               />
             </Field>
 
@@ -477,21 +550,6 @@ export default function NewProductPage() {
                   ))}
                 </SelectContent>
               </Select>
-            </Field>
-
-            <Field label="Markup %" required error={formErrors.markup}>
-              <div className="relative">
-                <Input
-                  className={`pr-7 ${formErrors.markup ? "border-destructive" : ""}`}
-                  value={form.markup}
-                  onChange={(e) => set("markup", e.target.value)}
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  placeholder="e.g. 55.68"
-                />
-                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm font-medium text-muted-foreground">%</span>
-              </div>
             </Field>
 
             <Field label="Tax Rate">
