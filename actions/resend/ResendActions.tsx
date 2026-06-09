@@ -3,6 +3,7 @@
 import AdminNotificationEmail from "@/components/EmailTemplates/AdminNotificationEmail";
 import ContactAdminEmail from "@/components/EmailTemplates/ContactAdminEmail";
 import HelpFormEmail from "@/components/EmailTemplates/HelpFormEmail";
+import ReferralCodeEmail from "@/components/EmailTemplates/ReferralCodeEmail";
 import { render } from "@react-email/components";
 import { Resend } from "resend";
 
@@ -16,11 +17,16 @@ interface HelpFormEmailData {
 }
 
 interface ContactFormData {
-  name:    string;
-  email:   string;
-  phone?:  string;
-  topic:   string;
+  name: string;
+  email: string;
+  phone?: string;
+  topic: string;
   message: string;
+}
+
+interface ContactUsReferral{
+  name: string;
+  email: string;
 }
 
 export const HelpFormConfirmation = async (data: HelpFormEmailData) => {
@@ -28,8 +34,8 @@ export const HelpFormConfirmation = async (data: HelpFormEmailData) => {
     const response = await resend.emails.send({
       from:
         process.env.NODE_ENV === "development"
-          ? "Canadian's Cart <onboarding@resend.dev>"
-          : "Canadian's Cart <no-reply@canadianscart.ca>",
+          ? "Candian's Cart <onboarding@resend.dev>"
+          : "Candian's Cart <no-reply@canadianscart.ca>",
       to:
         process.env.NODE_ENV === "development"
           ? [process.env.DEV_EMAIL!]
@@ -55,13 +61,13 @@ export const HelpFormConfirmation = async (data: HelpFormEmailData) => {
   }
 };
 
-export const SendtoAdmin = async (data:HelpFormEmailData) =>{
-   try {
+export const SendtoAdmin = async (data: HelpFormEmailData) => {
+  try {
     const response = await resend.emails.send({
       from:
         process.env.NODE_ENV === "development"
-          ? "Canadian's Cart <onboarding@resend.dev>"
-          : "Canadian's Cart <no-reply@canadianscart.ca>",
+          ? "Candian's Cart <onboarding@resend.dev>"
+          : "Candian's Cart <no-reply@canadianscart.ca>",
       to:
         process.env.NODE_ENV === "development"
           ? [process.env.DEV_EMAIL!]
@@ -84,15 +90,15 @@ export const SendtoAdmin = async (data:HelpFormEmailData) =>{
     console.log(error);
     return Response.json({ error: "Failed to send email" }, { status: 500 });
   }
-}
+};
 
-export const SendContactAdmin = async (data:ContactFormData) =>{
+export const SendContactAdmin = async (data: ContactFormData) => {
   try {
     const response = await resend.emails.send({
       from:
         process.env.NODE_ENV === "development"
-          ? "Canadian's Cart <onboarding@resend.dev>"
-          : "Canadian's Cart <no-reply@canadianscart.ca>",
+          ? "Candian's Cart <onboarding@resend.dev>"
+          : "Candian's Cart <no-reply@canadianscart.ca>",
       to:
         process.env.NODE_ENV === "development"
           ? [process.env.DEV_EMAIL!]
@@ -117,3 +123,32 @@ export const SendContactAdmin = async (data:ContactFormData) =>{
     return Response.json({ error: "Failed to send email" }, { status: 500 });
   }
 }
+
+export const SendReferralCode = async (data: ContactUsReferral) => {
+  try {
+    const response = await resend.emails.send({
+      from:
+        process.env.NODE_ENV === "development"
+          ? "Candian's Cart <onboarding@resend.dev>"
+          : "Candian's Cart <no-reply@canadianscart.ca>",
+      to:
+        process.env.NODE_ENV === "development"
+          ? [process.env.DEV_EMAIL!]
+          : [data.email],
+      subject: "🎟️ Your Candian's Cart referral code is here",
+      html: await render(
+        <ReferralCodeEmail
+          recipientName={data.name}
+          recipientEmail={data.email}
+          referralCode={"WELCOMETOCC"}
+        />,
+      ),
+    });
+
+    if (response.error) return { success: false, error: response.error.message };
+    return { success: true };
+  } catch (error) {
+    console.log(error);
+    return { success: false, error: "Failed to send referral code email" };
+  }
+};

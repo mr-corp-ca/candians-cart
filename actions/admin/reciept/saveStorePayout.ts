@@ -45,6 +45,7 @@ export async function saveStorePayoutAction(
       orderIds: receipt.orderIds.map((id) => new mongoose.Types.ObjectId(id)),
       storeId: new mongoose.Types.ObjectId(receipt._id),
       totalCustomerPaid: receipt.totalCustomerPaid,
+      totalBasePrice: receipt.totalBasePrice,
       totalGST: receipt.totalGST,
       totalPST: receipt.totalPST,
       totalTax: receipt.totalTax,
@@ -53,7 +54,8 @@ export async function saveStorePayoutAction(
       storebasetaxGST: receipt.storebasetaxGST,
       storebasetaxPST: receipt.storebasetaxPST,
       storeMarkupTax: receipt.storeMarkupTax,
-      platformMarkuptax: receipt.platformMarkuptax,
+      platformMarkupGSTTax: receipt.platformMarkupGSTTax,
+      platformMarkupPSTTax: receipt.platformMarkupPSTTax,
       totalDisposableFee: receipt.totalDisposableFee,
       storeFixedValue: receipt.storeFixedValue,
       storeProfit: receipt.storeProfit,
@@ -66,7 +68,7 @@ export async function saveStorePayoutAction(
       status: "pending",
     });
 
-    console.log("saved")
+    console.log("Payout Receipt Saved");
 
     return {
       success: true,
