@@ -10,11 +10,18 @@ export interface ProductFilters {
   minPrice?: number; // in cents
   maxPrice?: number; // in cents
   subsidised?: boolean;
+  subsidyLevel?: "low" | "medium" | "high";
   inStock?: boolean;
   taxRates?: TaxRate[];
   markupMin?: number;
   markupMax?: number;
-  sortBy?: "recommended" | "price_asc" | "price_desc" | "name_asc";
+  sortBy?:
+    | "recommended"
+    | "price_asc"
+    | "price_desc"
+    | "name_asc"
+    | "markup_desc"
+    | "markup_asc";
 }
 
 export const getStoreProductsFiltered = async (
@@ -58,13 +65,29 @@ export const getStoreProductsFiltered = async (
         query.markup.$lte = filters.markupMax;
     }
 
+    if (filters.subsidyLevel) {
+      query.markup = query.markup || {};
+      if (filters.subsidyLevel === "low") {
+        query.markup.$gte = 0;
+        query.markup.$lt = 50;
+      } else if (filters.subsidyLevel === "medium") {
+        query.markup.$gte = 50;
+        query.markup.$lt = 100;
+      } else if (filters.subsidyLevel === "high") {
+        query.markup.$gte = 100;
+      }
+    }
+
     let sortOption: Record<string, 1 | -1> = { createdAt: -1, _id: -1 };
     if (filters.sortBy === "price_asc") sortOption = { price: 1, _id: 1 };
     else if (filters.sortBy === "price_desc")
       sortOption = { price: -1, _id: -1 };
     else if (filters.sortBy === "name_asc") {
       sortOption = { name: 1, _id: 1 };
-    }
+    } else if (filters.sortBy === "markup_desc")
+      sortOption = { markup: -1, _id: -1 };
+    else if (filters.sortBy === "markup_asc")
+      sortOption = { markup: 1, _id: 1 };
 
     const skip = (page - 1) * limit;
 
@@ -183,6 +206,19 @@ export const searchProductsWithFilters = async (
         matchStage.markup.$lte = filters.markupMax;
     }
 
+    if (filters.subsidyLevel) {
+      matchStage.markup = matchStage.markup || {};
+      if (filters.subsidyLevel === "high") {
+        matchStage.markup.$gte = 100;
+      } else if (filters.subsidyLevel === "medium") {
+        matchStage.markup.$gte = 45;
+        matchStage.markup.$lte = 100;
+      } else if (filters.subsidyLevel === "low") {
+        matchStage.markup.$gte = 0;
+        matchStage.markup.$lte = 45;
+      }
+    }
+
     if (Object.keys(matchStage).length > 0) {
       pipeline.push({ $match: matchStage });
     }
@@ -194,6 +230,10 @@ export const searchProductsWithFilters = async (
       pipeline.push({ $sort: { price: -1, _id: -1 } });
     else if (filters.sortBy === "name_asc")
       pipeline.push({ $sort: { name: 1, _id: 1 } });
+    else if (filters.sortBy === "markup_desc")
+      pipeline.push({ $sort: { markup: -1, _id: -1 } });
+    else if (filters.sortBy === "markup_asc")
+      pipeline.push({ $sort: { markup: 1, _id: 1 } });
     // default: Atlas search score order (most relevant first)
 
     // ADD these three stages right before the $project push
