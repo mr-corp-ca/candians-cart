@@ -82,43 +82,93 @@ const UserList = (props: UserListProps) => {
   // ── Package Hook ────────────────────────────────────────────────────────────
   const [debouncedSearch] = useDebounce(search, 500);
 
+  // ── Scanner refs ────────────────────────────────────────────────────────────
   const searchInputRef = useRef<HTMLInputElement>(null);
   const scanBufferRef = useRef("");
-  const lastKeyTimeRef = useRef(0);
+
+  // Focus input on mount
+  useEffect(() => {
+    setTimeout(() => searchInputRef.current?.focus(), 0);
+  }, []);
 
   // Reset to page 1 when the debounced search changes
   useEffect(() => {
     setPage(1);
   }, [debouncedSearch]);
 
-  // QR Scanner Keydown Listener
-  useEffect(() => {
-    const THRESHOLD = 50;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const now = Date.now();
-      const gap = now - lastKeyTimeRef.current;
-      lastKeyTimeRef.current = now;
+  const OBJECT_ID_RE = /^[a-f0-9]{24}$/i;
 
+  const commitScan = (value: string) => {
+    const trimmed = value.trim();
+    if (!OBJECT_ID_RE.test(trimmed)) return;
+    setSearch(trimmed);
+    searchInputRef.current?.focus();
+    setTimeout(() => searchInputRef.current?.select(), 0);
+  };
+
+  // ── Universal scanner handler — works on desktop, iOS, and Android ──────────
+  // Strategy: accumulate every character into a ref buffer. The moment the
+  // buffer is exactly 24 hex chars (a MongoDB ObjectId), commit and clear.
+  // This avoids all timing heuristics and works regardless of how the OS
+  // delivers scanner input (keydown bursts, input events, IME composition).
+  useEffect(() => {
+    const accumulate = (chars: string) => {
+      scanBufferRef.current += chars;
+      // Trim to last 24 chars in case of any prefix garbage
+      if (scanBufferRef.current.length > 24) {
+        scanBufferRef.current = scanBufferRef.current.slice(-24);
+      }
+      if (OBJECT_ID_RE.test(scanBufferRef.current)) {
+        const id = scanBufferRef.current;
+        scanBufferRef.current = "";
+        commitScan(id);
+      }
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Enter") {
+        // Fallback: if Enter arrives before we hit 24 chars, try what we have
         const buf = scanBufferRef.current;
         scanBufferRef.current = "";
-
-        if (buf.length >= 6) {
-          e.preventDefault();
-          e.stopPropagation();
-          searchInputRef.current?.focus();
-          setSearch(buf);
-          setTimeout(() => searchInputRef.current?.select(), 0);
-        }
+        if (OBJECT_ID_RE.test(buf)) commitScan(buf);
         return;
       }
       if (e.key.length !== 1) return;
-      if (gap > THRESHOLD) scanBufferRef.current = "";
-      scanBufferRef.current += e.key;
+      accumulate(e.key);
     };
 
+    const handleCompositionEnd = (e: CompositionEvent) => {
+      if (!e.data) return;
+      scanBufferRef.current = "";
+      accumulate(e.data);
+    };
+
+    const handleInput = (e: Event) => {
+      const inputEvent = e as InputEvent;
+      if (inputEvent.isComposing) return;
+      const val = (e.target as HTMLInputElement).value;
+      if (!val) return;
+      // Sync buffer to current full input value so we always have the latest state
+      scanBufferRef.current = val.slice(-24);
+      if (OBJECT_ID_RE.test(scanBufferRef.current)) {
+        const id = scanBufferRef.current;
+        scanBufferRef.current = "";
+        // Clear the input so next scan starts fresh
+        setSearch("");
+        setTimeout(() => commitScan(id), 0);
+      }
+    };
+
+    const input = searchInputRef.current;
     window.addEventListener("keydown", handleKeyDown, true);
-    return () => window.removeEventListener("keydown", handleKeyDown, true);
+    window.addEventListener("compositionend", handleCompositionEnd, true);
+    input?.addEventListener("input", handleInput);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown, true);
+      window.removeEventListener("compositionend", handleCompositionEnd, true);
+      input?.removeEventListener("input", handleInput);
+    };
   }, []);
 
   // ── Unified Server Fetch (For Admins AND Cashiers) ─────────────────────────
@@ -153,7 +203,7 @@ const UserList = (props: UserListProps) => {
       if (!mounted) return;
 
       if (result.success) {
-        setFetchedCustomers(result.data as unknown as SerializedCustomer[]); 
+        setFetchedCustomers(result.data as unknown as SerializedCustomer[]);
         if (result.pagination) setServerPagination(result.pagination);
       } else {
         toast.error(result.error || "Failed to fetch customers");
@@ -175,7 +225,7 @@ const UserList = (props: UserListProps) => {
   ]);
 
   // ── Sort ───────────────────────────────────────────────────────────
-  const getSortableTime = (c: SerializedCustomer) => { 
+  const getSortableTime = (c: SerializedCustomer) => {
     const t = new Date(c.createdAt).getTime();
     if (Number.isFinite(t) && t > 0) return t;
     const idStr = c._id.toString();
@@ -197,7 +247,7 @@ const UserList = (props: UserListProps) => {
     ? serverPagination.totalCount
     : fetchedCustomers.length;
 
-  const handleScanResult = (scannedId: string) => setSearch(scannedId);
+  const handleScanResult = (scannedId: string) => commitScan(scannedId);
 
   // ── Heading ─────────────────────────────────────────────────────────────────
   const heading = isAllStores ? "All Customers" : "Customer List";
@@ -250,6 +300,11 @@ const UserList = (props: UserListProps) => {
                 placeholder={searchPlaceholder}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
+                autoFocus
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="off"
+                spellCheck={false}
                 className="rounded-xl border-0 bg-transparent focus-visible:ring-1 text-sm h-9 pr-9"
               />
               {search && (
@@ -317,7 +372,6 @@ const UserList = (props: UserListProps) => {
                     </span>
                   </Link>
                 )}
-                {/* We can cast here as any to satisfy CustomerCard if it still hasn't been updated to SerializedCustomer */}
                 <CustomerCard customer={customer as any} userRole={userRole} />
               </div>
             ))}
@@ -345,7 +399,6 @@ const UserList = (props: UserListProps) => {
                     />
                   </PaginationItem>
 
-                  {/* Dynamic Ellipsis Logic */}
                   {Array.from({ length: totalPages }, (_, i) => i + 1)
                     .filter(
                       (p) =>

@@ -1,6 +1,14 @@
 "use client";
 
-import { useState, useTransition, useEffect, useCallback, useRef } from "react";
+import {
+  useState,
+  useTransition,
+  useEffect,
+  useCallback,
+  useRef,
+  forwardRef,
+  useImperativeHandle,
+} from "react";
 import Image from "next/image";
 import {
   BadgeDollarSign,
@@ -40,8 +48,6 @@ function useCashierMobile() {
   }, []);
   return isMobile;
 }
-
-// Helper to determine the correct style and label for the subsidy badge
 const getSubsidyConfig = (markup: number = 0) => {
   if (markup >= 100) {
     return {
@@ -67,30 +73,46 @@ const getSubsidyConfig = (markup: number = 0) => {
   };
 };
 
-interface CustomerProductCardProps {
-  isCashier?: boolean;
-  customerId?: string;
-  product: IProduct;
-  cartQuantity?: number;
-  subsidyPage?: boolean;
+export interface ProductCardHandle {
+  focusQty: () => void;
 }
 
-export function CustomerProductCard({
-  isCashier,
-  customerId,
-  product,
-  cartQuantity = 0,
-}: CustomerProductCardProps) {
-  const [dialogOpen, setDialogOpen] = useState<boolean>(false);
-  const [imgError, setImgError] = useState<boolean>(false);
+export const CustomerProductCard = forwardRef<
+  ProductCardHandle,
+  {
+    isCashier?: boolean;
+    customerId?: string;
+    product: IProduct;
+    cartQuantity?: number;
+    subsidyPage: boolean;
+  }
+>(function CustomerProductCard(
+  { isCashier, customerId, product, cartQuantity = 0 },
+  ref,
+) {
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [imgError, setImgError] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [quantity, setQuantity] = useState<number>(cartQuantity);
   const [inputValue, setInputValue] = useState<string>(String(cartQuantity));
   const [isQtyDirty, setIsQtyDirty] = useState<boolean>(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
+  const qtyInputRef = useRef<HTMLInputElement>(null);
   const cashierMobile = useCashierMobile();
   const cashier = isCashier && !cashierMobile;
+
+  const quantityStep = 1;
+
+  useImperativeHandle(ref, () => ({
+    focusQty: () => {
+      setInputValue("");
+      setIsQtyDirty(true);
+      setTimeout(() => {
+        qtyInputRef.current?.focus();
+        qtyInputRef.current?.select();
+      }, 0);
+    },
+  }));
 
   const formatQtyForInput = useCallback(
     (value: number) => {
@@ -122,6 +144,7 @@ export function CustomerProductCard({
     },
     [product.isMeasuredInWeight],
   );
+
 
   useEffect(() => {
     setQuantity(cartQuantity);
@@ -467,6 +490,7 @@ export function CustomerProductCard({
 
                     <div className="flex flex-1 items-center justify-center gap-1">
                       <input
+                        ref={qtyInputRef}
                         type="number"
                         min={0}
                         max={99}
@@ -567,4 +591,4 @@ export function CustomerProductCard({
       </div>
     </>
   );
-}
+});
