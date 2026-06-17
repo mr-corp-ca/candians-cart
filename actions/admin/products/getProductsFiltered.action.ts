@@ -51,7 +51,11 @@ export const getStoreProductsFiltered = async (
 
     if (filters.subsidised === true) query.subsidised = true;
 
-    if (filters.inStock === true) query.stock = true;
+    if (filters.inStock !== undefined) {
+      const isFilterInStock =
+        filters.inStock === true || String(filters.inStock) === "true";
+      query.stock = isFilterInStock;
+    }
 
     if (filters.taxRates && filters.taxRates.length > 0) {
       query.tax = { $in: filters.taxRates };
@@ -66,6 +70,7 @@ export const getStoreProductsFiltered = async (
     }
 
     if (filters.subsidyLevel) {
+      query.subsidised = { $ne: true };
       query.markup = query.markup || {};
       if (filters.subsidyLevel === "low") {
         query.markup.$gte = 0;
@@ -195,27 +200,37 @@ export const searchProductsWithFilters = async (
         matchStage.price.$lte = filters.maxPrice;
     }
     if (filters.subsidised === true) matchStage.subsidised = true;
-    if (filters.inStock === true) matchStage.stock = true;
+
+    if (filters.inStock !== undefined) {
+      const isFilterInStock =
+        filters.inStock === true || String(filters.inStock) === "true";
+      matchStage.stock = isFilterInStock;
+    }
+
     if (filters.taxRates && filters.taxRates.length > 0)
       matchStage.tax = { $in: filters.taxRates };
+
     if (filters.markupMin !== undefined || filters.markupMax !== undefined) {
       matchStage.markup = {};
+
       if (filters.markupMin !== undefined)
         matchStage.markup.$gte = filters.markupMin;
+
       if (filters.markupMax !== undefined)
         matchStage.markup.$lte = filters.markupMax;
     }
 
     if (filters.subsidyLevel) {
+      matchStage.subsidised = { $ne: true };
       matchStage.markup = matchStage.markup || {};
       if (filters.subsidyLevel === "high") {
         matchStage.markup.$gte = 100;
       } else if (filters.subsidyLevel === "medium") {
-        matchStage.markup.$gte = 45;
-        matchStage.markup.$lte = 100;
+        matchStage.markup.$gte = 50;
+        matchStage.markup.$lt = 100;
       } else if (filters.subsidyLevel === "low") {
         matchStage.markup.$gte = 0;
-        matchStage.markup.$lte = 45;
+        matchStage.markup.$lt = 50;
       }
     }
 

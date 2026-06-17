@@ -20,6 +20,7 @@ import Link from "next/link";
 import { getUser } from "@/actions/customer/User.action";
 import { TopUpDialog } from "@/components/customer/wallet/TopupDialog";
 import ProgressBarCart, {
+  CartAmountBadge,
   SubsidyCart,
 } from "@/components/customer/products/ProgressBarCart";
 import { ICartItem } from "@/types/customer/CustomerCart";
@@ -35,6 +36,7 @@ import { QuantityControl } from "@/components/customer/products/QuantityControls
 import { cn } from "@/lib/utils";
 import AddMiscItemModalTrigger from "@/components/cashier/MiscItemTrigger";
 import { MiscItemsSection } from "@/components/cashier/MiscItemSection";
+import { UPCScannerCart } from "@/components/cashier/UPCScannerCart";
 
 const fmt = (cents: number) => (cents / 100).toFixed(2);
 
@@ -77,13 +79,13 @@ const CustomerCart = async ({ customerId }: { customerId?: string }) => {
   ]);
 
   const giftWalletBalance = UserData?.giftWalletBalance ?? 0;
-  const items =
-    (CartItems?.items as ICartItem[] | null)
-      ?.slice()
-      .sort(
-        (a, b) =>
-          Number(a.productId.subsidised) - Number(b.productId.subsidised),
-      ) ?? [];
+  const UserStoreId = UserData?.associatedStoreId?.toString() ?? "";
+  const rawItems = (CartItems?.items as ICartItem[] | null) ?? [];
+  const nonSubsidised = rawItems
+    .filter((i) => !i.productId.subsidised)
+    .reverse();
+  const subsidised = rawItems.filter((i) => i.productId.subsidised).reverse();
+  const items = [...nonSubsidised, ...subsidised];
   const subItems = (CartItems?.subItems as ISubsidyItems[]) ?? [];
   const MiscItems = (CartItems?.miscItems as IMiscCartItem[]) ?? [];
   const subItemProductIds = subItems.map((s) => s.productId._id.toString());
@@ -92,7 +94,18 @@ const CustomerCart = async ({ customerId }: { customerId?: string }) => {
     !items ||
     (items.length === 0 && subItems.length === 0 && MiscItems.length === 0)
   )
-    return <EmptyCart customerId={customerId} />;
+    return (
+      <>
+      <div className=" mt-5 mx-5">
+      {customerId && <UPCScannerCart
+        customerId={customerId}
+        storeId={UserStoreId}
+        />}
+      </div>
+    <EmptyCart customerId={customerId} />
+      
+      </>
+  );
 
   const itemTotals = items.reduce(
     (acc, item) => {
@@ -251,7 +264,6 @@ const CustomerCart = async ({ customerId }: { customerId?: string }) => {
   const TotalSubsidy = Number(
     ((newSubisdyCalc + giftWalletBalance) / 100).toFixed(2),
   );
-  const totalItemCount = items.length + subItems.length;
 
   // ── Sub-components ──────────────────────────────────────────────
 
@@ -440,6 +452,12 @@ const CustomerCart = async ({ customerId }: { customerId?: string }) => {
     <div className={cn("min-h-screen", !isCashier && "bg-background")}>
       {!isCashier && <Navbar />}
 
+       {customerId && (
+        <div className="px-4 xl:px-8 pt-5 xl:pt-8 xl:max-w-5xl xl:mx-auto">
+          <UPCScannerCart customerId={customerId} storeId={UserStoreId} />
+        </div>
+      )}
+      
       <div
         className="xl:hidden flex flex-col"
         style={{ minHeight: "calc(100dvh - 0px)" }}
@@ -465,20 +483,15 @@ const CustomerCart = async ({ customerId }: { customerId?: string }) => {
                 {isCashier ? "Customer's Cart" : "My Cart"}
               </h1>
             </div>
-            <Badge
-              variant="secondary"
-              className="rounded-full font-semibold shrink-0"
-            >
-              {totalItemCount}
-            </Badge>
             {isCashier && (
               <AddMiscItemModalTrigger customerId={customerId || ""} />
             )}
           </div>
 
           {/* Progress */}
-          <Card className="border-border/60 shadow-none">
-            <CardContent className="p-4">
+          <div className={`${isCashier && 'hidden'} border-border/60 shadow-none`}>
+          
+            <div className={`${isCashier && 'hidden'}`}>
               <ProgressBarCart
                 total={progressTotal.total}
                 customerId={customerId}
@@ -488,8 +501,9 @@ const CustomerCart = async ({ customerId }: { customerId?: string }) => {
                 SubsidyonOrder={Math.round(newSubisdyCalc)}
                 subItemIds={subItemProductIds}
               />
-            </CardContent>
-          </Card>
+            </div>
+            <CartAmountBadge total={progressTotal.total} />
+          </div>
 
           {/* Cart items */}
           <section>
@@ -688,19 +702,8 @@ const CustomerCart = async ({ customerId }: { customerId?: string }) => {
                   <h1 className="text-xl font-bold tracking-tight text-foreground leading-tight truncate">
                     {isCashier ? "Customer's Cart" : "My Cart"}
                   </h1>
-                  {isCashier && (
-                    <p className="text-xs text-muted-foreground leading-tight">
-                      Managing order on behalf of customer
-                    </p>
-                  )}
                 </div>
               </div>
-              <Badge
-                variant="secondary"
-                className="rounded-full font-semibold ml-1 shrink-0"
-              >
-                {totalItemCount} {totalItemCount === 1 ? "item" : "items"}
-              </Badge>
             </div>
             {isCashier && (
               <AddMiscItemModalTrigger customerId={customerId || ""} />
@@ -708,8 +711,8 @@ const CustomerCart = async ({ customerId }: { customerId?: string }) => {
           </div>
 
           {/* Progress bar */}
-          <Card className="mb-6 border-border/60 shadow-none">
-            <CardContent className="px-5 py-4">
+          <div className="mb-6 border-border/60 shadow-none">
+              <div className={`${isCashier && 'hidden'}`}>              
               <ProgressBarCart
                 total={progressTotal.total}
                 customerId={customerId}
@@ -718,9 +721,12 @@ const CustomerCart = async ({ customerId }: { customerId?: string }) => {
                 Totalsubsidy={TotalSubsidy}
                 SubsidyonOrder={Math.round(newSubisdyCalc)}
                 subItemIds={subItemProductIds}
-              />
-            </CardContent>
-          </Card>
+                />
+              </div> 
+              <div className="mt-3">
+                <CartAmountBadge total={progressTotal.total} />
+              </div>
+          </div>
 
           {/* 2-col layout */}
           <div className="flex gap-6 items-start">

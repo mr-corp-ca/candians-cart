@@ -22,12 +22,15 @@ const cashierSchema = new Schema<ICashier>(
     email: {
       type: String,
       required: true,
-      unique: true
+      unique: true,
+      lowercase: true,
+      trim: true,
     },
     mobile: {
       type: String,
       required: true,
       unique: true,
+      trim: true,
     },
     address: {
       type: String,

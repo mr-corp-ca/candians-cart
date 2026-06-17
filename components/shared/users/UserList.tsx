@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { CalendarDays, Search, Store, Users, X } from "lucide-react";
+import { Search, Store, Users, X } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import CustomerCard from "./CustomerCard";
@@ -27,8 +27,6 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
-
-type SortOrder = "newest" | "oldest";
 
 const CustomerCardSkeleton = () => (
   <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-3 animate-pulse">
@@ -53,8 +51,17 @@ type UserListProps = {
 };
 
 const ITEMS_PER_PAGE = 12;
-
 const OBJECT_ID_RE = /^[a-f0-9]{24}$/i;
+
+// Hoisted outside component to prevent recreation on every render
+const getSortableTime = (c: SerializedCustomer) => {
+  const t = new Date(c.createdAt).getTime();
+  if (Number.isFinite(t) && t > 0) return t;
+  const idStr = c._id.toString();
+  if (/^[a-fA-F0-9]{24}$/.test(idStr))
+    return parseInt(idStr.slice(0, 8), 16) * 1000;
+  return 0;
+};
 
 const UserList = (props: UserListProps) => {
   const isAdminMode = props.adminMode === true;
@@ -67,15 +74,14 @@ const UserList = (props: UserListProps) => {
   const isAllStores = isAdminMode && !storeId;
 
   // ── State ───────────────────────────────────────────────────────────────────
-  const [fetchedCustomers, setFetchedCustomers] = useState<SerializedCustomer[]>(
-    (props.myStoreCustomersData || []).slice(0, ITEMS_PER_PAGE)
-  );
+  const [fetchedCustomers, setFetchedCustomers] = useState<
+    SerializedCustomer[]
+  >((props.myStoreCustomersData || []).slice(0, ITEMS_PER_PAGE));
 
   const [isLoading, setIsLoading] = useState(
     isAdminMode && !props.myStoreCustomersData,
   );
   const [search, setSearch] = useState("");
-  const [sortOrder, setSortOrder] = useState<SortOrder>("newest");
   const [page, setPage] = useState(1);
 
   const [serverPagination, setServerPagination] =
@@ -88,6 +94,8 @@ const UserList = (props: UserListProps) => {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const scanBufferRef = useRef("");
 
+
+  
   // Focus input on mount
   useEffect(() => {
     setTimeout(() => searchInputRef.current?.focus(), 0);
@@ -99,15 +107,10 @@ const UserList = (props: UserListProps) => {
   }, [debouncedSearch]);
 
   // ── Universal scanner handler ───────────────────────────────────────────────
-  // commitScan lives INSIDE the effect so it always closes over fresh setSearch.
-  // We blur the input after a scan so React's controlled onChange can't
-  // corrupt the buffer on the next scan.
   useEffect(() => {
     const commitScan = (value: string) => {
       const trimmed = value.trim();
       if (!OBJECT_ID_RE.test(trimmed)) return;
-      // Blur first — prevents the focused input's onChange from interfering
-      // with the next scan's buffer accumulation
       searchInputRef.current?.blur();
       setSearch(trimmed);
     };
@@ -148,7 +151,7 @@ const UserList = (props: UserListProps) => {
       window.removeEventListener("keydown", handleKeyDown, true);
       window.removeEventListener("compositionend", handleCompositionEnd, true);
     };
-  }, []); // no deps — commitScan uses setSearch which is stable from useState
+  }, []);
 
   // ── QR button scan (camera-based) ──────────────────────────────────────────
   const handleScanResult = (scannedId: string) => {
@@ -163,32 +166,50 @@ const UserList = (props: UserListProps) => {
     let mounted = true;
 
     const load = async () => {
+      const query = debouncedSearch.trim();
+
+      // IF CASHIER AND NO SEARCH: Don't load anything, show empty state immediately
+      if (cashierRole && !query) {
+        if (mounted) {
+          setFetchedCustomers([]);
+          setServerPagination(null);
+          setIsLoading(false);
+        }
+        return;
+      }
+
       if (
         !isAdminMode &&
         page === 1 &&
-        !debouncedSearch &&
+        !query &&
         props.myStoreCustomersData &&
         props.myStoreCustomersData.length > 0
       ) {
         setFetchedCustomers(props.myStoreCustomersData);
-        if (props.initialPagination) setServerPagination(props.initialPagination);
+        if (props.initialPagination)
+          setServerPagination(props.initialPagination);
         setIsLoading(false);
         return;
       }
 
       setIsLoading(true);
 
-      const query = debouncedSearch.trim();
       const result = query
         ? await getSearchCustomer(query, storeId, page, ITEMS_PER_PAGE)
         : await getStoreCustomers(storeId, page, ITEMS_PER_PAGE);
 
       if (!mounted) return;
 
-      if (result.success) {
-        setFetchedCustomers(result.data as unknown as SerializedCustomer[]);
-        if (result.pagination) setServerPagination(result.pagination);
-      } else {
+    if (result.success) {
+      setFetchedCustomers(result.data as unknown as SerializedCustomer[]);
+      if (result.pagination) setServerPagination(result.pagination);
+
+      const isBarcodeScan = cashierRole && OBJECT_ID_RE.test(query);
+      if (isBarcodeScan && result.data.length === 1) {
+        router.push(`/cashier/customer/${result.data[0]._id}/cart`);
+        return;
+      }
+    } else {
         toast.error(result.error || "Failed to fetch customers");
       }
       setIsLoading(false);
@@ -205,25 +226,15 @@ const UserList = (props: UserListProps) => {
     debouncedSearch,
     props.myStoreCustomersData,
     props.initialPagination,
+    cashierRole,
   ]);
 
-  // ── Sort ───────────────────────────────────────────────────────────
-  const getSortableTime = (c: SerializedCustomer) => {
-    const t = new Date(c.createdAt).getTime();
-    if (Number.isFinite(t) && t > 0) return t;
-    const idStr = c._id.toString();
-    if (/^[a-fA-F0-9]{24}$/.test(idStr))
-      return parseInt(idStr.slice(0, 8), 16) * 1000;
-    return 0;
-  };
-
+  // ── Derived Data / Sort ────────────────────────────────────────────────────
   const displayData = useMemo(() => {
-    return [...fetchedCustomers].sort((a, b) =>
-      sortOrder === "newest"
-        ? getSortableTime(b) - getSortableTime(a)
-        : getSortableTime(a) - getSortableTime(b),
+    return [...fetchedCustomers].sort(
+      (a, b) => getSortableTime(b) - getSortableTime(a)
     );
-  }, [fetchedCustomers, sortOrder]);
+  }, [fetchedCustomers]);
 
   const totalPages = serverPagination ? serverPagination.totalPages : 1;
   const totalCount = serverPagination
@@ -231,7 +242,7 @@ const UserList = (props: UserListProps) => {
     : fetchedCustomers.length;
 
   // ── Heading ─────────────────────────────────────────────────────────────────
-  const heading = isAllStores ? "All Customers" : "Customer List";
+  const heading = isAllStores ? "All Customers" : "Customers";
   const searchPlaceholder = isAllStores
     ? "Search id, name, email, phone or store…"
     : cashierRole || storeRole
@@ -250,25 +261,13 @@ const UserList = (props: UserListProps) => {
             <h1 className="text-base sm:text-lg font-semibold">{heading}</h1>
             {isLoading ? (
               <Skeleton className="h-5 w-10 rounded-full" />
-            ) : (
+            ) : cashierRole && !debouncedSearch ? null : (
+              // Hides the customer count badge for cashiers if no search
               <Badge variant="secondary" className="text-xs tabular-nums">
                 {totalCount} Customers
               </Badge>
             )}
           </div>
-
-          <Button
-            variant={sortOrder === "oldest" ? "default" : "secondary"}
-            size="sm"
-            className="gap-1.5 text-xs h-8 px-2.5 shrink-0"
-            onClick={() =>
-              setSortOrder((p) => (p === "newest" ? "oldest" : "newest"))
-            }
-            type="button"
-          >
-            <CalendarDays className="w-3.5 h-3.5" />
-            <span>{sortOrder === "newest" ? "Newest" : "Oldest"}</span>
-          </Button>
         </div>
 
         <div className="flex items-center gap-2 px-3 pb-3 sm:px-4">
@@ -309,6 +308,14 @@ const UserList = (props: UserListProps) => {
             <CustomerCardSkeleton key={i} />
           ))}
         </div>
+      ) : cashierRole && !debouncedSearch ? (
+        // New State specifically for Cashiers before they execute a search
+        <div className="flex flex-col items-center justify-center py-16 text-muted-foreground gap-3">
+          <Search className="w-10 h-10 opacity-20" />
+          <p className="text-sm">
+            Search for a customer by name, ID, or scan a QR code to begin.
+          </p>
+        </div>
       ) : displayData.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-muted-foreground gap-3">
           <Users className="w-10 h-10 opacity-20" />
@@ -335,7 +342,7 @@ const UserList = (props: UserListProps) => {
                 className={`flex flex-col gap-0 ${cashierRole || isAdminMode ? "hover:cursor-pointer" : ""}`}
                 onClick={() => {
                   if (cashierRole)
-                    router.push(`/cashier/customer/${customer._id}`);
+                    router.push(`/cashier/customer/${customer._id}/cart`);
                   if (isAdminMode)
                     router.push(`/admin/customers/${customer._id}`);
                 }}
@@ -352,7 +359,8 @@ const UserList = (props: UserListProps) => {
                     </span>
                   </Link>
                 )}
-                <CustomerCard customer={customer as any} userRole={userRole} />
+                {/* No typecasting needed; customer is strictly typed */}
+                <CustomerCard customer={customer} userRole={userRole} />
               </div>
             ))}
           </div>
