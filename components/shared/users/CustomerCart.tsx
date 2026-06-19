@@ -1,14 +1,11 @@
 import { getCart } from "@/actions/customer/ProductAndStore/Cart.Action";
 import { EmptyCart } from "@/components/customer/products/EmptyCart";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import {
-  ShoppingCart,
   Shield,
   Wallet,
-  ChevronLeft,
   Gift,
   Package,
   Receipt,
@@ -16,7 +13,6 @@ import {
   BadgePercent,
 } from "lucide-react";
 import Image from "next/image";
-import Link from "next/link";
 import { getUser } from "@/actions/customer/User.action";
 import { TopUpDialog } from "@/components/customer/wallet/TopupDialog";
 import ProgressBarCart, {
@@ -37,6 +33,7 @@ import { cn } from "@/lib/utils";
 import AddMiscItemModalTrigger from "@/components/cashier/MiscItemTrigger";
 import { MiscItemsSection } from "@/components/cashier/MiscItemSection";
 import { UPCScannerCart } from "@/components/cashier/UPCScannerCart";
+import ClearCartDialog from "./ClearCartDialog";
 
 const fmt = (cents: number) => (cents / 100).toFixed(2);
 
@@ -96,11 +93,14 @@ const CustomerCart = async ({ customerId }: { customerId?: string }) => {
   )
     return (
       <>
-        <div className=" mt-5 mx-5">
           {customerId && (
-            <UPCScannerCart customerId={customerId} storeId={UserStoreId} />
+            <div className="w-full flex items-center gap-2 px-4 xl:px-8 pt-5 xl:pt-8">
+              <div className="flex-1">
+                <UPCScannerCart customerId={customerId} storeId={UserStoreId} />
+              </div>
+              <AddMiscItemModalTrigger customerId={customerId || ""} />
+            </div>
           )}
-        </div>
         <EmptyCart customerId={customerId} />
       </>
     );
@@ -484,6 +484,9 @@ const CustomerCart = async ({ customerId }: { customerId?: string }) => {
               />
             </div>
             <CartAmountBadge total={progressTotal.total} />
+            <div className="flex justify-end mt-2 p-2">
+              <ClearCartDialog customerId={customerId} />
+            </div>
           </div>
 
           {/* Cart items */}
@@ -501,7 +504,7 @@ const CustomerCart = async ({ customerId }: { customerId?: string }) => {
             </div>
 
             {/* Scrollable items list */}
-            <div className="max-h-[460px] overflow-y-auto rounded-xl space-y-2 pr-0.5">
+            <div data-cart-scroll className="max-h-[460px] overflow-y-auto rounded-xl space-y-2 pr-0.5">
               {items.map((item: ICartItem) => {
                 const { afterMarkup } = calcLine(item);
                 const hasImage = item.productId.images?.[0]?.url;
@@ -674,6 +677,9 @@ const CustomerCart = async ({ customerId }: { customerId?: string }) => {
             </div>
             <div className="mt-3">
               <CartAmountBadge total={progressTotal.total} />
+              <div className="flex justify-end mt-2">
+                <ClearCartDialog customerId={customerId} />
+              </div>
             </div>
           </div>
 
@@ -698,7 +704,7 @@ const CustomerCart = async ({ customerId }: { customerId?: string }) => {
                 </CardHeader>
 
                 {/* Scrollable items */}
-                <div className="max-h-[420px] overflow-y-auto divide-y divide-border/50">
+                <div data-cart-scroll className="max-h-[420px] overflow-y-auto divide-y divide-border/50">
                   {items.map((item: ICartItem) => {
                     const { afterMarkup } = calcLine(item);
                     const hasImage = item.productId.images?.[0]?.url;
