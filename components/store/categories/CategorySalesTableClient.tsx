@@ -8,6 +8,7 @@ import {
   endOfWeek,
   startOfMonth,
   endOfMonth,
+  endOfDay,
 } from "date-fns";
 import { type DateRange } from "react-day-picker";
 import {
@@ -39,16 +40,19 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-// Assuming you have this date picker component from your snippet
 import { DatePickerWithRange } from "@/components/admin/analytics/reciept/DatePickerWithRange";
-import { Spinner } from "@/components/ui/spinner"; // Or a loading icon
+import { Spinner } from "@/components/ui/spinner";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  getTodayVancouverBoundsUTC,
+  getVancouverDayBoundsUTC,
+} from "@/lib/timezone";
 
 interface CategorySalesTableClientProps {
   initialData: ICategorySales[];
   storeId: string;
 }
 
-// Utility to convert UTC to PST (America/Vancouver corresponds to Pacific Time)
 const formatToPST = (utcDateString: string) => {
   const date = new Date(utcDateString);
   return new Intl.DateTimeFormat("en-GB", {
@@ -70,37 +74,41 @@ export default function CategorySalesTableClient({
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [isPending, startTransition] = useTransition();
 
-  // Dialog State
   const [selectedCategory, setSelectedCategory] =
     useState<ICategorySales | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   const handleFilterChange = (value: string) => {
     setFilterType(value);
-    const today = new Date();
-    let startDate = new Date();
-    let endDate = new Date();
 
     if (value === "today") {
-      startDate.setHours(0, 0, 0, 0);
-      endDate.setHours(23, 59, 59, 999);
-    } else if (value === "week") {
-      startDate = startOfWeek(today);
-      endDate = endOfWeek(today);
-    } else if (value === "month") {
-      startDate = startOfMonth(today);
-      endDate = endOfMonth(today);
-    } else if (value === "custom") {
-      return; // Do not fetch until range is selected via date picker
+      const { start, end } = getTodayVancouverBoundsUTC();
+      fetchFilteredData(start, end);
+      return;
     }
-
-    fetchFilteredData(startDate, endDate);
+    if (value === "week") {
+      const today = new Date();
+      const { start } = getVancouverDayBoundsUTC(startOfWeek(today));
+      const { end } = getVancouverDayBoundsUTC(endOfWeek(today));
+      fetchFilteredData(start, end);
+      return;
+    }
+    if (value === "month") {
+      const today = new Date();
+      const { start } = getVancouverDayBoundsUTC(startOfMonth(today));
+      const { end } = getVancouverDayBoundsUTC(endOfMonth(today));
+      fetchFilteredData(start, end);
+      return;
+    }
+    if (value === "custom") return;
   };
 
   const handleDateRangeChange = (range: DateRange | undefined) => {
     setDateRange(range);
     if (range?.from && range?.to) {
-      fetchFilteredData(range.from, range.to);
+      const { start } = getVancouverDayBoundsUTC(range.from);
+      const { end } = getVancouverDayBoundsUTC(range.to);
+      fetchFilteredData(start, end);
     }
   };
 
@@ -140,9 +148,10 @@ export default function CategorySalesTableClient({
         )}
 
         {isPending && (
-          <span className="text-sm text-muted-foreground animate-pulse">
-            Updating...
-          </span>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Spinner className="w-4 h-4" />
+            <span>Updating...</span>
+          </div>
         )}
       </div>
 
@@ -157,7 +166,21 @@ export default function CategorySalesTableClient({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {data.length === 0 ? (
+            {isPending ? (
+              Array.from({ length: 5 }).map((_, index) => (
+                <TableRow key={index}>
+                  <TableCell>
+                    <Skeleton className="h-5 w-30" />
+                  </TableCell>
+                  <TableCell>
+                    <Skeleton className="h-5 w-10" />
+                  </TableCell>
+                  <TableCell className="text-right flex justify-end">
+                    <Skeleton className="h-8 w-25" />
+                  </TableCell>
+                </TableRow>
+              ))
+            ) : data.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={3} className="text-center h-24">
                   No sales found for this period.
@@ -167,7 +190,7 @@ export default function CategorySalesTableClient({
               data.map((row) => (
                 <TableRow key={row.category}>
                   <TableCell className="font-medium">{row.category}</TableCell>
-                  <TableCell>{row.totalSales}</TableCell>
+                  <TableCell>{Number(row.totalSales).toFixed(2)}</TableCell>
                   <TableCell className="text-right">
                     <Button
                       variant="outline"
@@ -217,7 +240,7 @@ export default function CategorySalesTableClient({
                     (detail: ICategorySaleDetail) => (
                       <TableRow key={detail.productId}>
                         <TableCell>{detail.productName}</TableCell>
-                        <TableCell>{detail.sales}</TableCell>
+                        <TableCell>{Number(detail.sales).toFixed(2)}</TableCell>
                         <TableCell>{formatToPST(detail.date)}</TableCell>
                       </TableRow>
                     ),
