@@ -11,6 +11,7 @@ import {
   Receipt,
   CreditCard,
   BadgePercent,
+  Plus,
 } from "lucide-react";
 import Image from "next/image";
 import { getUser } from "@/actions/customer/User.action";
@@ -30,10 +31,11 @@ import { getFibBracketFrom21 } from "@/lib/FibBracket";
 import { RemoveButton } from "@/components/customer/products/RemoveButton";
 import { QuantityControl } from "@/components/customer/products/QuantityControls";
 import { cn } from "@/lib/utils";
-import AddMiscItemModalTrigger from "@/components/cashier/MiscItemTrigger";
 import { MiscItemsSection } from "@/components/cashier/MiscItemSection";
 import { UPCScannerCart } from "@/components/cashier/UPCScannerCart";
 import ClearCartDialog from "./ClearCartDialog";
+import { Button } from "@/components/ui/button";
+import Link from "next/link";
 
 const fmt = (cents: number) => (cents / 100).toFixed(2);
 
@@ -99,7 +101,12 @@ const CustomerCart = async ({ customerId }: { customerId?: string }) => {
               <div className="flex-1">
                 <UPCScannerCart customerId={customerId} storeId={UserStoreId} />
               </div>
-              <AddMiscItemModalTrigger customerId={customerId || ""} />
+              <Link href={`/cashier/customer/${customerId}/new-product`}>
+                <Button size="sm" className="gap-1.5">
+                  <Plus className="h-4 w-4" />
+                  Add Product
+                </Button>
+              </Link>
             </div>
           )}
         <EmptyCart customerId={customerId} />
@@ -237,9 +244,11 @@ const CustomerCart = async ({ customerId }: { customerId?: string }) => {
 
   // console.log(miscTotals)
 
+  const PlatformFee = 50;
+
   const totals = {
     subtotal: Math.round(
-      itemTotals.subtotal + subsidyTotals.subtotal + miscTotals.subtotal+50,
+      itemTotals.subtotal + subsidyTotals.subtotal + miscTotals.subtotal,
     ),
     gst: itemTotals.gst + subsidyTotals.gst + miscTotals.gst,
     pst: itemTotals.pst + subsidyTotals.pst + miscTotals.pst,
@@ -247,12 +256,12 @@ const CustomerCart = async ({ customerId }: { customerId?: string }) => {
       itemTotals.totalTax + subsidyTotals.totalTax + miscTotals.totalTax,
     disposable: itemTotals.disposable + subsidyTotals.disposable,
     total: Math.round(
-      itemTotals.total + subsidyTotals.total + miscTotals.total+50,
+      itemTotals.total + subsidyTotals.total + miscTotals.total + PlatformFee,
     ),
     totalMarkup: itemTotals.totalMarkup + subsidyTotals.totalMarkup,
   };
   
-  console.log("Total markup : ",totals.totalMarkup)
+  console.log("Total markup : ",totals)
   const showGST = totals.gst > 0;
   const showPST = totals.pst > 0;
   const active = activeMarkup ?? 0;
@@ -277,7 +286,7 @@ const CustomerCart = async ({ customerId }: { customerId?: string }) => {
     <>
       <div className="flex justify-between text-sm">
           <span className="text-muted-foreground">Platform Fee</span>
-          <span className="font-medium tabular-nums">CA${fmt(50)}</span>
+          <span className="font-medium tabular-nums">CA${fmt(PlatformFee)}</span>
       </div>
       {showGST && (
         <div className="flex justify-between text-sm">
@@ -467,7 +476,12 @@ const CustomerCart = async ({ customerId }: { customerId?: string }) => {
           <div className="flex-1">
             <UPCScannerCart customerId={customerId} storeId={UserStoreId} />
           </div>
-          <AddMiscItemModalTrigger customerId={customerId || ""} />
+              <Link href={`/cashier/customer/${customerId}/new-product`}>
+                <Button size="sm" className="gap-1.5">
+                  <Plus className="h-4 w-4" />
+                  Add Product
+                </Button>
+              </Link>
         </div>
       )}
 
