@@ -1,5 +1,7 @@
 import { model, Model, models, Schema, Types } from "mongoose";
 
+export type EventParticipantStatus = "participant" | "winner";
+
 export interface ICustomer {
   userId: Types.ObjectId;
   name: string;
@@ -13,6 +15,7 @@ export interface ICustomer {
   referralCode: string;
   walletBalance: number;
   giftWalletBalance: number;
+  eventParticipant?: EventParticipantStatus;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -77,6 +80,11 @@ const customerSchema = new Schema<ICustomer>(
       required: true,
       default: 0,
       min: [0, "Gift Wallet balance cannot be negative"],
+    },
+    eventParticipant: {
+      type: String,
+      enum: ["participant", "winner"],
+      // No default — undefined means they haven't joined the draw yet
     },
   },
   { timestamps: true },
