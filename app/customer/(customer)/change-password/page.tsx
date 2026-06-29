@@ -1,13 +1,13 @@
-import ChangePasswordForm from '@/components/auth/ChangePasswordForm'
+import ChangePasswordForm from '@/components/auth/ChangePasswordForm';
 import Navbar from '@/components/customer/landing/Navbar';
 
-const customerChangePassword = () => {
+const CustomerChangePasswordPage = () => {
   return (
     <div>
       <Navbar />
       <ChangePasswordForm />
     </div>
   );
-}
+};
 
-export default customerChangePassword
+export default CustomerChangePasswordPage;

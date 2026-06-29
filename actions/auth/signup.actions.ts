@@ -27,62 +27,65 @@ export const signupAction = async (
 
     if (userRole === "customer") {
       const result = CustomerSchema.safeParse(rawData);
+
       if (!result.success) {
         const errorMessage = zodErrorResponse(result);
         return { success: false, message: errorMessage || "Validation error" };
       }
 
       const data = result.data;
-      if (data.province !== "BC") {
-        return { success: false, message: "Province must be BC" };
-      }
 
-      const allowedCities = [
-        "Vancouver",
-        "Burnaby",
-        "New Westminster",
-        "Coquitlam",
-        "Port Coquitlam",
-        "Port Moody",
-        "Surrey",
-        "Delta",
-        "Langley",
-        "Maple Ridge",
-        "Pitt Meadows",
-        "Abbotsford",
-        "Mission",
-        "Chilliwack",
-        "Agassiz",
-        "Hope",
-      ];
-
-      if (!allowedCities.includes(data.city)) {
-        return { success: false, message: "Invalid city selected" };
-      }
       await dbConnect();
 
-      // Validate referral code before starting the transaction
       const referralCode = await ReferralCode.findOne({
         code: data.referralCode,
       });
 
-      if (!referralCode)
+      if (!referralCode) {
         return { success: false, message: "Referral Code not found" };
+      }
 
       const inactive = !referralCode.isActive;
+
       const usageFull =
         referralCode.maxUses && referralCode.uses >= referralCode.maxUses;
+
       const expired =
         referralCode.expiresAt &&
         referralCode.expiresAt.getTime() <= Date.now();
 
-      if (inactive || usageFull || expired)
+      if (inactive || usageFull) {
         return {
           success: false,
           message: "Sorry, the referral code is no longer valid.",
         };
+      }
 
-      // Check if store exists before starting the transaction
+      if (expired) {
+        if (referralCode.type === "customer") {
+          referralCode.uses = 0;
+          await referralCode.save();
+
+          const customer = await Customer.findOneAndUpdate(
+            { referralCode: referralCode._id },
+            { $set: { perReferAmount: 2 } },
+            { new: true },
+          );
+
+          if (!customer) {
+            return {
+              success: false,
+              message: "Customer not found for this referral code.",
+            };
+          }
+        } else {
+          return {
+            success: false,
+            message: "Sorry, the referral code is no longer valid.",
+          };
+        }
+      }
+
       const store = await Store.findById(data.associatedStore);
 
       if (!store) {
@@ -97,35 +100,49 @@ export const signupAction = async (
         };
       }
 
-      // Create auth user before transaction since it's an external system
+      // Create auth user
       const newCustomerUser = await auth.api.signUpEmail({
         body: { name: data.name, email: data.email, password: data.password },
       });
 
-      if (!newCustomerUser)
+      if (!newCustomerUser) {
         return {
           success: false,
           message: "Something went wrong while creating account",
         };
+      }
 
-      // Start transaction for all DB writes
       const session = await mongoose.startSession();
       session.startTransaction();
 
       try {
+        let subsidy = 55;
+
+        if (referralCode.type === "customer") {
+          const referredCustomer = await Customer.findById(
+            referralCode.customerId,
+          ).session(session);
+
+          if (!referredCustomer) throw new Error("Referral customer not found");
+
+          subsidy = Math.max((referredCustomer.subsidy ?? 55) - 1, 50);
+        }
+
         const customer = await Customer.create(
           [
             {
               userId: newCustomerUser.user.id,
               name: data.name,
               email: data.email,
-              mobile: data.mobile,
               address: data.address,
               city: data.city,
               province: data.province,
+              postalCode: data.postalCode,
+              heardAboutUs: data.heardAboutUs,
               monthlyBudget: data.monthlyBudget * 100,
               associatedStoreId: data.associatedStore,
-              referralCode: data.referralCode,
+              referralCodeId: referralCode._id,
+              subsidy,
             },
           ],
           { session },
@@ -137,7 +154,7 @@ export const signupAction = async (
         const newStoreMember = await Store.findByIdAndUpdate(
           data.associatedStore,
           { $inc: { members: 1 } },
-          { returnDocument: "after" },
+          { returnDocument: "after", session },
         );
 
         if (!newStoreMember)
@@ -152,8 +169,17 @@ export const signupAction = async (
         await session.commitTransaction();
       } catch (err) {
         await session.abortTransaction();
-        // Auth user was created but DB failed — you may want to delete the auth user here
-        console.log("Transaction failed, rolling back: ", err);
+
+        // Roll back the auth user too
+        try {
+          await auth.api.removeUser({
+            body: { userId: newCustomerUser.user.id },
+          });
+        } catch (deleteErr) {
+          console.error("Failed to delete orphan auth user:", deleteErr);
+        }
+
+        console.log("Customer Signup Transaction failed, rolling back:", err);
         return {
           success: false,
           message:
@@ -164,10 +190,10 @@ export const signupAction = async (
       } finally {
         session.endSession();
       }
+
       return {
         success: true,
-        message:
-          "Your account has been created. We’ve sent a verification link to your email. Please verify your email." // and then login
+        message: "Account created! Let's verify your phone number.",
       };
     } else if (userRole === "store") {
       const session = await getUserSession();

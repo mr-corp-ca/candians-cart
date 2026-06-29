@@ -9,13 +9,14 @@ import {
   User,
   ChevronDown,
   ContactRound,
+  Hash,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type Props = {
   customer: Pick<
     Customer,
-    "name" | "email" | "address" | "city" | "province" | "mobile"
+    "name" | "email" | "address" | "city" | "province" | "postalCode" | "mobile"
   >;
 };
 
@@ -28,7 +29,7 @@ function ContactRow({
   label: string;
   value: string;
 }) {
-  const inner = (
+  return (
     <div className="flex items-center gap-3 py-3.5 group">
       <div className="shrink-0 w-9 h-9 rounded-xl bg-secondary flex items-center justify-center text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary transition-all duration-200">
         <Icon className="h-3.5 w-3.5" />
@@ -37,33 +38,47 @@ function ContactRow({
         <p className="text-[10px] uppercase tracking-wider text-muted-foreground/50 font-semibold leading-none">
           {label}
         </p>
-        <p className="text-sm font-semibold text-foreground truncate mt-1 transition-colors duration-200">
+        <p className="text-sm font-semibold text-foreground break-words mt-1 transition-colors duration-200">
           {value}
         </p>
       </div>
     </div>
   );
-
-  return inner;
 }
 
 export default function ProfileContact({ customer }: Props) {
+  const formatMobile = (val: string) => {
+    if (!val) return "Not set";
+    let raw = val.replace(/\D/g, "");
+    if (raw.length === 11 && raw.startsWith("1")) raw = raw.slice(1);
+    const digits = raw.slice(0, 10);
+    if (digits.length >= 7)
+      return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+    if (digits.length >= 4) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+    if (digits.length >= 1) return `(${digits}`;
+    return val;
+  };
+
   const [open, setOpen] = useState(false);
 
-  const rows = [
+  const rows: { icon: React.ElementType; label: string; value: string }[] = [
     { icon: User, label: "Full Name", value: customer.name },
     { icon: Mail, label: "Email Address", value: customer.email },
     {
       icon: MapPin,
       label: "Home Address",
-      value: `${customer.address}, ${customer.city}, ${customer.province}`,
+      value: `${customer.address}, ${customer.city}, ${customer.province}${customer.postalCode ? ` ${customer.postalCode}` : ""}`,
     },
-    { icon: Phone, label: "Mobile Number", value: customer.mobile },
+    {
+      icon: Phone,
+      label: "Mobile Number",
+      value: formatMobile(customer.mobile ?? ""),
+    },
   ];
 
   return (
     <div className="rounded-3xl border border-border/60 bg-card overflow-hidden shadow-sm">
-      {/* ── Mobile: toggle ── */}
+      {/* Mobile: toggle */}
       <button
         onClick={() => setOpen((v) => !v)}
         className="w-full flex items-center justify-between px-5 py-4 hover:bg-secondary/40 transition-colors group lg:hidden"
@@ -97,7 +112,7 @@ export default function ProfileContact({ customer }: Props) {
         </div>
       )}
 
-      {/* ── Desktop: always open ── */}
+      {/* Desktop: always open */}
       <div className="hidden lg:block">
         <div className="px-5 py-3.5 border-b border-border/40 flex items-center gap-2.5">
           <ContactRound className="h-4 w-4 text-primary" />

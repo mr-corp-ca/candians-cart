@@ -2,7 +2,6 @@
 
 import { revalidatePath, revalidateTag } from "next/cache";
 import { editProfileSchema } from "@/zod/schemas/customer/customerSignup";
-import { z } from "zod";
 import { getUserSession } from "../auth/getUserSession.actions";
 import { dbConnect } from "@/db/dbConnect";
 
@@ -10,6 +9,7 @@ import mongoose from "mongoose";
 import Customer, { ICustomer } from "@/db/models/customer/customer.model";
 import { zodErrorResponse } from "@/zod/validation/error";
 import { formDataToObject } from "@/zod/validation/form";
+import { revalidateCustomerCache } from "../cache/user.cache";
 
 export type ProfileState = {
   errors?: {
@@ -17,7 +17,7 @@ export type ProfileState = {
     address?: string[];
     city?: string[];
     province?: string[];
-    mobile?: string[];
+    postalCode?: string[];
   };
   message?: string | null;
   success?: boolean;
@@ -27,7 +27,6 @@ export async function editUserProfile(
   prevState: ProfileState,
   formData: FormData,
 ): Promise<ProfileState> {
-  // Check for user and its role to be customer
   const currentUser = await getUserSession();
 
   if (currentUser.user.role !== "customer") {
@@ -36,6 +35,7 @@ export async function editUserProfile(
       message: "Unauthorized: Only customer can edit this",
     };
   }
+
   const rawData = formDataToObject(formData);
   const result = editProfileSchema.safeParse(rawData);
 
@@ -44,11 +44,11 @@ export async function editUserProfile(
     return { success: false, message: errorMessage || "Validation error" };
   }
 
-  const { name, address, city, province, mobile } = result.data;
+  // postalCode added, mobile removed (handled by phone OTP verification)
+  const { name, address, city, province, postalCode } = result.data;
 
   try {
     await dbConnect();
-    // to update the name on both user table and customer table we use session
     const session = await mongoose.startSession();
 
     await session.withTransaction(async () => {
@@ -65,17 +65,16 @@ export async function editUserProfile(
         address,
         city,
         province,
-        mobile,
+        postalCode, // now included
+        // mobile intentionally omitted — updated via phone OTP verification
       };
 
-      // updating in Customer table
       await Customer.updateOne(
         { _id: customerProfile._id },
         { $set: updatePayload },
         { session },
       );
 
-      // updating the name in the user table, we have _id in user table and we convert the user.id to Mongoose type
       await mongoose.connection
         .collection("user")
         .updateOne(
@@ -87,9 +86,7 @@ export async function editUserProfile(
 
     await session.endSession();
 
-    revalidatePath("/customer/profile");
-    revalidateTag("customer","max")
-    revalidateTag("customer-and-store","max")
+    await revalidateCustomerCache();
 
     return {
       success: true,
@@ -100,7 +97,7 @@ export async function editUserProfile(
     console.log(`Database error during the profile update: `, error);
     return {
       success: false,
-      message: "A server error occured while updating your profile",
+      message: "A server error occurred while updating your profile",
     };
   }
 }

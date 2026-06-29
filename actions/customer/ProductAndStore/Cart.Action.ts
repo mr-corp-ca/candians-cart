@@ -17,6 +17,9 @@ import Customer from "@/db/models/customer/customer.model";
 import { getUserSession } from "@/actions/auth/getUserSession.actions";
 import OrderModel from "@/db/models/customer/Orders.Model";
 import "@/db/models/customer/MiscItem.model";
+import ReferralCode from "@/db/models/admin/referralCode.model";
+import { Cashier } from "@/db/models/cashier/cashier.model";
+import { WalletTopUp } from "@/db/models/cashier/walletTopUp.model";
 
 export const AddtoCart = async (
   ItemId: string,
@@ -462,34 +465,33 @@ export const PlaceOrder = async ({
       };
     });
 
-    const subsidyItems = SubItems.map((item) => {
-      const product = item.productId as unknown as IProduct;
-      const afterSubsidy = Math.max(
-        item.TotalPrice * item.quantity - item.subsidy,
-        0,
-      );
-      const tax = product.tax;
-      const disposableFee = product.disposableFee ?? 0;
+  const subsidyItems = SubItems.map((item) => {
+    const product = item.productId as unknown as IProduct;
+    const disposableFee = (product.disposableFee ?? 0) * item.quantity;
+    const fullPriceWithDisposable = item.TotalPrice * item.quantity;
+    const priceForTax = fullPriceWithDisposable - disposableFee;
+    
+    const afterSubsidy = Math.max(fullPriceWithDisposable - item.subsidy, 0);
+    const tax = product.tax;
 
-      const gst =
-        tax === 0.05 || tax === 0.12 ? Math.round(afterSubsidy * 0.05) : 0;
+    const gst =
+      tax === 0.05 || tax === 0.12 ? Math.round(priceForTax * 0.05) : 0;
+    const pst =
+      tax === 0.07 || tax === 0.12 ? Math.round(priceForTax * 0.07) : 0;
 
-      const pst =
-        tax === 0.07 || tax === 0.12 ? Math.round(afterSubsidy * 0.07) : 0;
+    baseTotal += product.price * item.quantity;
+    TotalUsedSubsidy += item.subsidy;
 
-      baseTotal += product.price * item.quantity;
-      TotalUsedSubsidy += item.subsidy;
-
-      return {
-        productId: new Types.ObjectId(product._id),
-        quantity: item.quantity,
-        markup: product.markup,
-        tax,
-        disposableFee,
-        subsidy: item.subsidy,
-        total: Math.round(afterSubsidy + gst + pst + disposableFee),
-      };
-    });
+    return {
+      productId: new Types.ObjectId(product._id),
+      quantity: item.quantity,
+      markup: product.markup,
+      tax,
+      disposableFee,
+      subsidy: item.subsidy,
+      total: Math.round(afterSubsidy + gst + pst),
+    };
+  });
 
     const miscItems = MiscItems.map((item) => {
       const populated = item.itemId as unknown as {
@@ -566,7 +568,7 @@ export const PlaceOrder = async ({
           $inc: { walletBalance: -OrderData.cartTotal },
           $set: { giftWalletBalance: OrderData.subsidyLeft },
         },
-        { session, new: true, runValidators: true },
+        { session, returnDocument: 'after', runValidators: true },
       );
 
       if (!updated) {
@@ -579,7 +581,7 @@ export const PlaceOrder = async ({
         {
           $set: { giftWalletBalance: OrderData.subsidyLeft },
         },
-        { session, new: true, runValidators: true },
+        { session, returnDocument: 'after', runValidators: true },
       );
 
       if (!updated) {
@@ -592,11 +594,143 @@ export const PlaceOrder = async ({
     await CartModel.deleteOne({ customerId: User._id }, { session });
 
     await session.commitTransaction();
+    await EnableUserReferralFlag(OrderData.subsidy,User._id.toString(),User.name,User.referralCodeId.toString())
     return { success: true, message: "Order Placed Successfully" };
   } catch (error) {
     await session.abortTransaction();
     console.error("Error while placing order:", error);
     return { success: false, error: "Something went wrong" };
+  } finally {
+    await session.endSession();
+  }
+};
+
+const EnableUserReferralFlag = async (
+  orderSubsidy: number,
+  customerId: string,
+  customerName: string,
+  userReferralCodeId:string
+) => {
+  if (!customerId || !orderSubsidy)
+    return { success: false, message: "Invalid customerId or subsidy amount" };
+  try {
+    await dbConnect();
+
+    if (orderSubsidy <= 0)
+      return { success: true, message: "No subsidy used, referral flags not enabled" };
+
+    const CustomerData = await Customer.findOneAndUpdate(
+      { _id: customerId, placedFirstOrder: false, referralCodeEnabled: false },
+      { $set: { referralCodeEnabled: true, placedFirstOrder: true, perReferAmount:5 } },
+      { returnDocument: 'before' },
+    ).select("_id").lean();
+
+    if (!CustomerData)
+      return { success: true, message: "Referral flags already enabled or customer not found" };
+
+    await Promise.all([
+      GenerateReferralCode(customerId, customerName).catch((err) =>
+        console.error("GenerateReferralCode failed:", err)
+      ),
+      CheckUserReferral(userReferralCodeId,CustomerData.perReferAmount).catch((err) =>
+        console.error("CheckUserReferral failed:", err)
+      ),
+    ]);
+    return { success: true, message: "Referral flags enabled successfully" };
+  } catch (err) {
+    console.log(err);
+    return { success: false, message: "Error while enabling referral flags" };
+  }
+};
+
+export const GenerateReferralCode = async (customerId: string, customerName: string) => {
+  await dbConnect();
+
+  const namePart = customerName.replace(/\s+/g, "").slice(0, 4).toUpperCase();
+  const candidates = [
+    namePart + customerId.slice(-6),
+    namePart + customerId.slice(0, 6),
+  ];
+
+  const tryCreate = async (code: string) => {
+    const exists = await ReferralCode.exists({ code });
+    if (!exists) {
+      const created = await ReferralCode.create({
+        code,
+        customerId: new Types.ObjectId(customerId),
+        type: "customer",
+        isActive: true,
+        uses: 0,
+        maxUses:10,
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      });
+      await Customer.findOneAndUpdate(
+        { _id: customerId },
+        { $set: { myreferralCodeId: created._id } },
+      );
+      return code;
+    }
+    return null;
+  };
+
+  for (const code of candidates) {
+    const result = await tryCreate(code);
+    if (result) return { success: true, code: result };
+  }
+
+  for (let i = 0; i < 10; i++) {
+    const code = namePart + Math.random().toString(36).slice(2, 8).toUpperCase();
+    const result = await tryCreate(code);
+    if (result) return { success: true, code: result };
+  }
+
+  return { success: false, message: "Could not generate a unique referral code after all attempts" };
+};
+
+const CheckUserReferral = async (referralCodeId: string,perReferAmount:number) => {
+  if (!referralCodeId) return { success: false, message: "No referral Code Id passed" };
+
+  await dbConnect();
+  const session = await mongoose.startSession();
+
+  try {
+    const UserSession = await getUserSession();
+
+    const [referral, cashier] = await Promise.all([
+      ReferralCode.findById(referralCodeId).lean(),
+      Cashier.findOne({ userId: UserSession.user.id }).select("_id").lean(),
+    ]);
+
+    if (!referral) return { success: false, message: "Referral not found" };
+    if (referral.type === "admin") return { success: false, message: "Referral belongs to admin account" };
+    if (!cashier) return { success: false, message: "Failed to get cashierId" };
+
+    const maxUsesReached = referral.maxUses != null && referral.uses >= referral.maxUses;
+    const isExpired = referral.expiresAt != null && Date.now() >= referral.expiresAt.getTime();
+    if (maxUsesReached || isExpired) {
+      return { success: false, message: "Referral code is expired or has reached its maximum uses" };
+    }
+
+    const ReferralValue = perReferAmount;
+    const customerId = referral.customerId;
+
+    session.startTransaction();
+
+    await Promise.all([
+      WalletTopUp.create(
+        [{ customerId, userId: cashier._id.toString(), userRole: "cashier", value: ReferralValue, paymentMode: "referral" }],
+        { session },
+      ),
+      Customer.findByIdAndUpdate(customerId, { $inc: { walletBalance: ReferralValue } }, { session, runValidators: true }),
+      ReferralCode.findByIdAndUpdate(referralCodeId, { $inc: { uses: 1 } }, { session }),
+    ]);
+
+    await session.commitTransaction();
+    return { success: true, message: "Referral topup created" };
+  } catch (error) {
+    await session.abortTransaction();
+    console.error(error);
+    return { success: false, message: "Error on CheckUserReferral" };
   } finally {
     await session.endSession();
   }

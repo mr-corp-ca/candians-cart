@@ -13,12 +13,16 @@ export interface AdminCustomer {
   city: string;
   province: string;
   walletBalance: number;
+  giftWalletBalance: number;
   associatedStoreId: string;
+  referralCodeId: string;
+  myreferralCodeId?: string;
+  referralCode?: string;
   storeName: string;
-  createdAt: Date;
+  createdAt: string;
+  updatedAt?: string;
   [key: string]: any;
 }
-
 export interface PaginationMeta {
   totalCount: number;
   totalPages: number;
@@ -41,6 +45,21 @@ export interface SearchCompound {
   filter?: Record<string, unknown>[];
 }
 
+
+function serializeCustomer(c: any): AdminCustomer {
+  return {
+    ...c,
+    _id: c._id?.toString() ?? "",
+    userId: c.userId?.toString() ?? "",
+    associatedStoreId: c.associatedStoreId?.toString() ?? "",
+    referralCodeId: c.referralCodeId?.toString() ?? "",
+    myreferralCodeId: c.myreferralCodeId?.toString() ?? "",
+    referralCode: c.referralCode ?? "",
+    createdAt: c.createdAt ? new Date(c.createdAt).toISOString() : "",
+    updatedAt: c.updatedAt ? new Date(c.updatedAt).toISOString() : "",
+  };
+}
+
 export async function getStoreCustomers(
   storeId: string | null | undefined,
   page: number = 1,
@@ -54,7 +73,10 @@ export async function getStoreCustomers(
     const skip = (currentPage - 1) * limitNum;
 
     const match: Record<string, any> = {};
-    if (storeId) match.associatedStoreId = new mongoose.Types.ObjectId(storeId);
+
+    if (storeId && mongoose.isValidObjectId(storeId)) {
+      match.associatedStoreId = new mongoose.Types.ObjectId(storeId);
+    }
 
     const totalCount = await Customer.countDocuments(match);
     const totalPages = Math.ceil(totalCount / limitNum);
@@ -64,6 +86,7 @@ export async function getStoreCustomers(
       { $sort: { createdAt: -1 } },
       { $skip: skip },
       { $limit: limitNum },
+
       {
         $lookup: {
           from: "stores",
@@ -72,21 +95,45 @@ export async function getStoreCustomers(
           as: "store",
         },
       },
-      { $unwind: { path: "$store", preserveNullAndEmptyArrays: true } },
-      { $addFields: { storeName: "$store.name" } },
-      { $project: { store: 0 } },
+      {
+        $unwind: {
+          path: "$store",
+          preserveNullAndEmptyArrays: true,
+        },
+      },
+
+      {
+        $lookup: {
+          from: "referralcodes",
+          localField: "referralCodeId",
+          foreignField: "_id",
+          as: "referralCodeData",
+        },
+      },
+      {
+        $unwind: {
+          path: "$referralCodeData",
+          preserveNullAndEmptyArrays: true,
+        },
+      },
+
+      {
+        $addFields: {
+          storeName: "$store.name",
+          referralCode: "$referralCodeData.code",
+        },
+      },
+      {
+        $project: {
+          store: 0,
+          referralCodeData: 0,
+        },
+      },
     ]);
 
     return {
       success: true,
-      data: data.map((c: any) => ({
-        ...c,
-        _id: c._id?.toString(),
-        userId: c.userId?.toString() ?? "",
-        associatedStoreId: c.associatedStoreId?.toString() ?? "",
-        createdAt: c.createdAt ? new Date(c.createdAt).toISOString() : "",
-        updatedAt: c.updatedAt ? new Date(c.updatedAt).toISOString() : "",
-      })),
+      data: data.map(serializeCustomer),
       pagination: {
         totalCount,
         totalPages,
@@ -97,7 +144,11 @@ export async function getStoreCustomers(
       },
     };
   } catch (error: any) {
-    return { success: false, data: [], error: error.message };
+    return {
+      success: false,
+      data: [],
+      error: error.message,
+    };
   }
 }
 
@@ -123,12 +174,14 @@ export async function getSearchCustomer(
     let totalCount = 0;
 
     if (mongoose.isValidObjectId(cleanSearchTerm)) {
-      const exactMatch: Record<string, mongoose.Types.ObjectId> = {
+      const exactMatch: Record<string, any> = {
         _id: new mongoose.Types.ObjectId(cleanSearchTerm),
       };
-      if (storeId) {
+
+      if (storeId && mongoose.isValidObjectId(storeId)) {
         exactMatch.associatedStoreId = new mongoose.Types.ObjectId(storeId);
       }
+
       pipeline.push({ $match: exactMatch });
       totalCount = await Customer.countDocuments(exactMatch);
     } else {
@@ -148,11 +201,17 @@ export async function getSearchCustomer(
               fuzzy: { maxEdits: 1 },
             },
           },
-          { text: { query: cleanSearchTerm, path: "mobile" } },
+          {
+            text: {
+              query: cleanSearchTerm,
+              path: "mobile",
+            },
+          },
         ],
         minimumShouldMatch: 1,
       };
-      if (storeId) {
+
+      if (storeId && mongoose.isValidObjectId(storeId)) {
         compoundStage.filter = [
           {
             equals: {
@@ -162,25 +221,30 @@ export async function getSearchCustomer(
           },
         ];
       }
+
       const searchStage: mongoose.PipelineStage = {
         $search: {
           index: "CustomerSearch",
           compound: compoundStage,
         },
       };
+
       pipeline.push(searchStage);
 
       const metaAgg = await Customer.aggregate([
         searchStage,
         { $count: "total" },
       ]);
+
       totalCount = metaAgg[0]?.total || 0;
     }
+
     const totalPages = Math.ceil(totalCount / limitNum);
 
     pipeline.push(
       { $skip: skip },
       { $limit: limitNum },
+
       {
         $lookup: {
           from: "stores",
@@ -189,23 +253,47 @@ export async function getSearchCustomer(
           as: "store",
         },
       },
-      { $unwind: { path: "$store", preserveNullAndEmptyArrays: true } },
-      { $addFields: { storeName: "$store.name" } },
-      { $project: { store: 0 } },
+      {
+        $unwind: {
+          path: "$store",
+          preserveNullAndEmptyArrays: true,
+        },
+      },
+
+      {
+        $lookup: {
+          from: "referralcodes",
+          localField: "referralCodeId",
+          foreignField: "_id",
+          as: "referralCodeData",
+        },
+      },
+      {
+        $unwind: {
+          path: "$referralCodeData",
+          preserveNullAndEmptyArrays: true,
+        },
+      },
+
+      {
+        $addFields: {
+          storeName: "$store.name",
+          referralCode: "$referralCodeData.code",
+        },
+      },
+      {
+        $project: {
+          store: 0,
+          referralCodeData: 0,
+        },
+      },
     );
 
     const data = await Customer.aggregate(pipeline);
 
     return {
       success: true,
-      data: data.map((c) => ({
-        ...c,
-        _id: c._id?.toString() ?? "",
-        userId: c.userId?.toString() ?? "",
-        associatedStoreId: c.associatedStoreId?.toString() ?? "",
-        createdAt: c.createdAt ? new Date(c.createdAt).toISOString() : "",
-        updatedAt: c.updatedAt ? new Date(c.updatedAt).toISOString() : "",
-      })),
+      data: data.map(serializeCustomer),
       pagination: {
         totalCount,
         totalPages,
@@ -218,6 +306,11 @@ export async function getSearchCustomer(
   } catch (error) {
     const errorMessage =
       error instanceof Error ? error.message : "Unknown error occurred";
-    return { success: false, data: [], error: errorMessage };
+
+    return {
+      success: false,
+      data: [],
+      error: errorMessage,
+    };
   }
 }

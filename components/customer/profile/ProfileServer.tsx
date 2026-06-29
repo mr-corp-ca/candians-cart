@@ -21,6 +21,7 @@ import { Metadata } from "next";
 import CustomerAdvertisements from "@/components/customer/shared/CustomerAdvertisements";
 import PromotionBanner from "@/components/promotions/PromotionsBanner";
 import { getPromoStats } from "@/actions/promotions/getPromoStats.action";
+import { getReferral } from "@/actions/customer/ReferralAction";
 
 export const metadata: Metadata = {
   title: "Profile",
@@ -33,6 +34,7 @@ export default async function ProfileServer() {
   ]);
   const promoStats = await getPromoStats();
   const { customerData } = customerRes;
+  const referralCodeData = await getReferral(customerData.myreferralCodeId);
   const { orderCount } = orderRes;
 
   const quickLinks = [
@@ -124,15 +126,16 @@ export default async function ProfileServer() {
       <div className="w-full max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="flex items-center gap-3 py-4 lg:py-6">
-          <Link href="/customer">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="rounded-full w-9 h-9 text-muted-foreground hover:text-foreground"
-            >
+          <Button
+            asChild
+            variant="ghost"
+            size="icon"
+            className="rounded-full w-9 h-9 text-muted-foreground hover:text-foreground"
+          >
+            <Link href="/customer">
               <ChevronLeft className="h-4 w-4" />
-            </Button>
-          </Link>
+            </Link>
+          </Button>
           <div>
             <h1 className="text-base font-bold tracking-tight leading-none">
               My Profile
@@ -146,7 +149,7 @@ export default async function ProfileServer() {
         <div className="pb-20 max-w-lg mx-auto lg:max-w-none">
           {/* ── Mobile ── */}
           <div className="flex flex-col gap-4 lg:hidden">
-            <ProfileHero customer={customerData} />
+            <ProfileHero customer={customerData} referralCode={referralCodeData.data}/>
 
             <div className="mx-auto w-full max-w-[360px] sm:max-w-[420px]">
               <PromotionBanner initialStats={promoStats} variant="card" />
@@ -169,7 +172,7 @@ export default async function ProfileServer() {
           <div className="hidden lg:grid grid-cols-[1fr_340px] gap-6 items-start">
             {/* Left col */}
             <div className="flex flex-col gap-4">
-              <ProfileHero customer={customerData} />
+              <ProfileHero customer={customerData} referralCode={referralCodeData.data} />
 
               <div className="mx-auto w-full max-w-[420px]">
                 <PromotionBanner initialStats={promoStats} variant="card" />

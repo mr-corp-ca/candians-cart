@@ -3,9 +3,9 @@ import { getSingleProduct } from "@/actions/store/products/getSingleProduct";
 import { redirect } from "next/navigation";
 
 interface PageParams {
-  params: {
+  params: Promise<{
     productId: string;
-  };
+  }>;
 }
 
 export default async function EditProductPage({ params }: PageParams) {
@@ -16,7 +16,7 @@ export default async function EditProductPage({ params }: PageParams) {
 
   if (!result || !result.success) {
     console.log("Cannot find the productId");
-    redirect("/admin/store");
+    redirect("/admin/stores");
   }
 
   return (

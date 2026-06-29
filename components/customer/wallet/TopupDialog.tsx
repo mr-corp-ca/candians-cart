@@ -46,9 +46,7 @@ export function TopUpDialog({
   const [loading, setLoading] = useState(false);
   const [amount, setAmount] = useState<number | null>(0);
   const [inputVal, setInputVal] = useState("0");
-  const [paymentMode, setPaymentMode] = useState<"cash" | "card" | "gift">(
-    "card",
-  );
+  const [paymentMode, setPaymentMode] = useState<"cash" | "card" | "gift">("card");
   const [cashReceived, setCashReceived] = useState<number | null>(null);
   const [cashReceivedInput, setCashReceivedInput] = useState("");
 
@@ -71,46 +69,32 @@ export function TopUpDialog({
       : exactOwedCents;
   const exactOwedDollars = adjustedOwedCents / 100;
 
+  const isExactCashMatch =
+    cashReceived !== null &&
+    amount !== null &&
+    Math.round(cashReceived * 100) === Math.round(amount * 100);
+
   const handlePreset = (preset: number) => {
     setAmount(preset);
     setInputVal(String(preset));
-
-    if (isCashPayment) {
-      setCashReceived(preset);
-      setCashReceivedInput(String(preset));
-    }
   };
 
   const handleExactPreset = () => {
     let finalCents = Math.max((cartTotal ?? 0) - (WalletBalance ?? 0), 0);
-
     const coveredCents = finalCents + (WalletBalance ?? 0);
     if (coveredCents < (cartTotal ?? 0)) {
       finalCents += (cartTotal ?? 0) - coveredCents;
     }
-
     const dollars = finalCents / 100;
-
     setAmount(dollars);
     setInputVal(dollars.toFixed(2));
-    if(isCashPayment){
-      setCashReceived(dollars);
-    }
   };
 
-  const handleCashRecivedPreset = () =>{
-    let finalCents = Math.max((cartTotal ?? 0) - (WalletBalance ?? 0), 0);
-
-    const coveredCents = finalCents + (WalletBalance ?? 0);
-    if (coveredCents < (cartTotal ?? 0)) {
-      finalCents += (cartTotal ?? 0) - coveredCents;
-    }
-
-    const dollars = finalCents / 100;
-    setCashReceived(dollars);
-    setCashReceivedInput(dollars.toFixed(2));
-
-  }
+  const handleCashReceivedPreset = () => {
+    if (amount === null) return;
+    setCashReceived(amount);
+    setCashReceivedInput(amount.toFixed(2));
+  };
 
   const handleInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
@@ -187,7 +171,6 @@ export function TopUpDialog({
         return;
       }
 
-      // Self top-up via Stripe
       const res = await fetch("/api/stripe/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -218,13 +201,11 @@ export function TopUpDialog({
         className="sm:max-w-sm p-0 overflow-hidden gap-0 border-0"
         style={{
           borderRadius: "24px",
-          boxShadow:
-            "0 32px 80px rgba(0,0,0,0.18), 0 0 0 1px rgba(0,0,0,0.06)",
+          boxShadow: "0 32px 80px rgba(0,0,0,0.18), 0 0 0 1px rgba(0,0,0,0.06)",
         }}
       >
         <DialogTitle className="sr-only">Top Up Wallet</DialogTitle>
 
-        {/* ── Header ──────────────────────────────────────────────────── */}
         <div
           className="flex items-center justify-between px-5 pt-5 pb-3"
           style={{ borderBottom: "1px solid rgba(0,0,0,0.06)" }}
@@ -237,10 +218,7 @@ export function TopUpDialog({
                 className="w-7 h-7 rounded-lg flex items-center justify-center hover:opacity-70 transition-opacity"
                 style={{ background: "var(--color-secondary)" }}
               >
-                <ArrowLeft
-                  size={13}
-                  style={{ color: "var(--color-primary)" }}
-                />
+                <ArrowLeft size={13} style={{ color: "var(--color-primary)" }} />
               </button>
             )}
             <div
@@ -258,10 +236,8 @@ export function TopUpDialog({
           </p>
         </div>
 
-        {/* ── Step 1: Amount entry ─────────────────────────────────────── */}
         {step === "amount" && (
           <div className="p-5 pb-4 space-y-5">
-            {/* Amount input */}
             <div
               className="flex items-center justify-between rounded-2xl px-4 py-3"
               style={{ background: "var(--color-secondary)" }}
@@ -289,48 +265,34 @@ export function TopUpDialog({
                 onClick={handleClear}
                 className="w-8 h-8 rounded-xl flex items-center justify-center transition-all hover:scale-110 active:scale-95"
                 style={{
-                  background: inputVal
-                    ? "var(--color-primary)"
-                    : "rgba(0,0,0,0.06)",
+                  background: inputVal ? "var(--color-primary)" : "rgba(0,0,0,0.06)",
                 }}
               >
                 <Delete
                   size={14}
-                  style={{
-                    color: inputVal
-                      ? "var(--color-primary-foreground)"
-                      : "#aaa",
-                  }}
+                  style={{ color: inputVal ? "var(--color-primary-foreground)" : "#aaa" }}
                 />
               </button>
             </div>
 
-            {/* Presets */}
             <div>
               <p className="text-[11px] font-medium text-gray-400 uppercase tracking-widest mb-2.5">
                 Quick Select
               </p>
               <div className="grid grid-cols-4 gap-2">
                 {PRESETS.filter((p) => p !== 250).map((preset) => {
-                  const isSelected =
-                    amount === preset && inputVal === String(preset);
+                  const isSelected = amount === preset && inputVal === String(preset);
                   return (
                     <button
                       key={preset}
                       onClick={() => handlePreset(preset)}
                       className="rounded-xl py-2.5 text-sm transition-all active:scale-95"
                       style={{
-                        background: isSelected
-                          ? "var(--color-primary)"
-                          : "var(--color-secondary)",
-                        color: isSelected
-                          ? "var(--color-primary-foreground)"
-                          : "var(--color-secondary-foreground)",
+                        background: isSelected ? "var(--color-primary)" : "var(--color-secondary)",
+                        color: isSelected ? "var(--color-primary-foreground)" : "var(--color-secondary-foreground)",
                         fontWeight: isSelected ? 700 : 500,
                         transform: isSelected ? "scale(1.04)" : "scale(1)",
-                        boxShadow: isSelected
-                          ? "0 4px 12px rgba(0,0,0,0.15)"
-                          : "none",
+                        boxShadow: isSelected ? "0 4px 12px rgba(0,0,0,0.15)" : "none",
                       }}
                     >
                       ${preset}
@@ -360,9 +322,7 @@ export function TopUpDialog({
                           ? "1.5px solid var(--color-primary)"
                           : "1.5px solid color-mix(in srgb, var(--color-primary) 35%, transparent)",
                         transform: isExactSelected ? "scale(1.04)" : "scale(1)",
-                        boxShadow: isExactSelected
-                          ? "0 4px 12px rgba(0,0,0,0.15)"
-                          : "none",
+                        boxShadow: isExactSelected ? "0 4px 12px rgba(0,0,0,0.15)" : "none",
                       }}
                     >
                       <span style={{ fontSize: "12px", fontWeight: 800, letterSpacing: "-0.3px" }}>
@@ -399,7 +359,6 @@ export function TopUpDialog({
               </div>
             </div>
 
-            {/* Payment mode — cashier only (not admin, not self) */}
             {customerId && !adminRole && (
               <PaymentModeToggle
                 paymentMode={paymentMode}
@@ -413,11 +372,22 @@ export function TopUpDialog({
                 style={{ background: "var(--color-secondary)" }}
               >
                 <div className="flex items-center justify-between">
-                  <p className="text-sm font-semibold text-gray-700">
-                    Cash Received
-                  </p>
-                  <Button variant={'default'} onClick={handleCashRecivedPreset} className="py-1 px-2 rounded-lg text-xs">
-                    <Banknote size={14}/>
+                  <p className="text-sm font-semibold text-gray-700">Cash Received</p>
+                  <Button
+                    variant="default"
+                    onClick={handleCashReceivedPreset}
+                    className="py-1 px-2 rounded-lg text-xs"
+                    style={
+                      isExactCashMatch
+                        ? {}
+                        : {
+                            background: "var(--color-secondary)",
+                            color: "var(--color-secondary-foreground)",
+                            boxShadow: "none",
+                          }
+                    }
+                  >
+                    <Banknote size={14} />
                     Exact
                   </Button>
                 </div>
@@ -445,28 +415,19 @@ export function TopUpDialog({
 
                 {amount && cashReceived !== null && (
                   <div className="flex items-center justify-between text-sm">
-                    <span style={{ color: "var(--color-muted-foreground)" }}>
-                      Change due
-                    </span>
-                    <span
-                      className="font-bold"
-                      style={{
-                        color:
-                          changeDue !== null && changeDue >= 0
-                            ? "var(--color-primary)"
-                            : "#ef4444",
-                      }}
-                    >
-                      {changeDue !== null && changeDue >= 0
-                        ? `$${changeDue.toFixed(2)}`
-                        : "Insufficient cash"}
-                    </span>
+                    <span style={{ color: "var(--color-muted-foreground)" }}>Change due</span>
+                    {changeDue !== null && changeDue >= 0 ? (
+                      <span className="font-bold tabular-nums" style={{ color: "var(--color-primary)" }}>
+                        ${(Math.round(Math.round(changeDue * 100) / 5) * 5 / 100).toFixed(2)}
+                      </span>
+                    ) : (
+                      <span className="font-bold" style={{ color: "#ef4444" }}>Insufficient cash</span>
+                    )}
                   </div>
                 )}
               </div>
             )}
 
-            {/* CTA */}
             <Button
               disabled={!amount || !cashReceivedIsValid}
               onClick={handleProceed}
@@ -494,79 +455,43 @@ export function TopUpDialog({
           </div>
         )}
 
-        {/* ── Step 2: Confirmation (cashier + admin only) ──────────────── */}
         {step === "confirm" && amount && (
           <div className="p-5 space-y-4">
-            {/* Summary card */}
             <div
               className="rounded-2xl px-4 py-4 space-y-3"
               style={{ background: "var(--color-secondary)" }}
             >
               <div className="flex items-center justify-between">
-                <span
-                  className="text-sm"
-                  style={{ color: "var(--color-muted-foreground)" }}
-                >
+                <span className="text-sm" style={{ color: "var(--color-muted-foreground)" }}>
                   Amount
                 </span>
-                <span
-                  className="text-2xl font-bold"
-                  style={{ color: "var(--color-primary)" }}
-                >
+                <span className="text-2xl font-bold" style={{ color: "var(--color-primary)" }}>
                   ${amount.toFixed(2)} CAD
                 </span>
               </div>
 
-              {/* Show method row only for cashier, not admin (admin always gifts) */}
               {customerId && !adminRole && (
                 <>
                   <Separator style={{ opacity: 0.15 }} />
                   <div className="flex items-center justify-between">
-                    <span
-                      className="text-sm"
-                      style={{ color: "var(--color-muted-foreground)" }}
-                    >
+                    <span className="text-sm" style={{ color: "var(--color-muted-foreground)" }}>
                       Payment method
                     </span>
                     <div className="flex items-center gap-2">
                       {paymentMode === "card" ? (
                         <>
-                          <CreditCard
-                            size={15}
-                            style={{ color: "var(--color-primary)" }}
-                          />
-                          <span
-                            className="text-sm font-semibold"
-                            style={{ color: "var(--color-foreground)" }}
-                          >
-                            Card
-                          </span>
+                          <CreditCard size={15} style={{ color: "var(--color-primary)" }} />
+                          <span className="text-sm font-semibold" style={{ color: "var(--color-foreground)" }}>Card</span>
                         </>
                       ) : paymentMode === "gift" ? (
                         <>
-                          <Gift
-                            size={15}
-                            style={{ color: "var(--color-primary)" }}
-                          />
-                          <span
-                            className="text-sm font-semibold"
-                            style={{ color: "var(--color-foreground)" }}
-                          >
-                            Gift
-                          </span>
+                          <Gift size={15} style={{ color: "var(--color-primary)" }} />
+                          <span className="text-sm font-semibold" style={{ color: "var(--color-foreground)" }}>Gift</span>
                         </>
                       ) : (
                         <>
-                          <Banknote
-                            size={15}
-                            style={{ color: "var(--color-primary)" }}
-                          />
-                          <span
-                            className="text-sm font-semibold"
-                            style={{ color: "var(--color-foreground)" }}
-                          >
-                            Cash
-                          </span>
+                          <Banknote size={15} style={{ color: "var(--color-primary)" }} />
+                          <span className="text-sm font-semibold" style={{ color: "var(--color-foreground)" }}>Cash</span>
                         </>
                       )}
                     </div>
@@ -578,56 +503,34 @@ export function TopUpDialog({
                 <>
                   <Separator style={{ opacity: 0.15 }} />
                   <div className="flex items-center justify-between">
-                    <span
-                      className="text-sm"
-                      style={{ color: "var(--color-muted-foreground)" }}
-                    >
+                    <span className="text-sm" style={{ color: "var(--color-muted-foreground)" }}>
                       Cash received
                     </span>
-                    <span
-                      className="text-sm font-semibold"
-                      style={{ color: "var(--color-foreground)" }}
-                    >
+                    <span className="text-sm font-semibold" style={{ color: "var(--color-foreground)" }}>
                       ${cashReceived?.toFixed(2)}
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span
-                      className="text-sm"
-                      style={{ color: "var(--color-muted-foreground)" }}
-                    >
+                    <span className="text-sm" style={{ color: "var(--color-muted-foreground)" }}>
                       Change due
                     </span>
-                    <span
-                      className="text-lg font-bold"
-                      style={{ color: "var(--color-primary)" }}
-                    >
-                      ${changeDue?.toFixed(2)}
+                    <span className="text-lg font-bold" style={{ color: "var(--color-primary)" }}>
+                      ${(Math.round(Math.round((changeDue ?? 0) * 100) / 5) * 5 / 100).toFixed(2)}
                     </span>
                   </div>
                 </>
               )}
 
-              {/* Admin: show gift label */}
               {adminRole && (
                 <>
                   <Separator style={{ opacity: 0.15 }} />
                   <div className="flex items-center justify-between">
-                    <span
-                      className="text-sm"
-                      style={{ color: "var(--color-muted-foreground)" }}
-                    >
+                    <span className="text-sm" style={{ color: "var(--color-muted-foreground)" }}>
                       Type
                     </span>
                     <div className="flex items-center gap-2">
-                      <Gift
-                        size={15}
-                        style={{ color: "var(--color-primary)" }}
-                      />
-                      <span
-                        className="text-sm font-semibold"
-                        style={{ color: "var(--color-foreground)" }}
-                      >
+                      <Gift size={15} style={{ color: "var(--color-primary)" }} />
+                      <span className="text-sm font-semibold" style={{ color: "var(--color-foreground)" }}>
                         Gift top-up
                       </span>
                     </div>
@@ -636,12 +539,8 @@ export function TopUpDialog({
               )}
             </div>
 
-            {/* Change method hint — cashier only */}
             {customerId && !adminRole && (
-              <p
-                className="text-xs text-center"
-                style={{ color: "var(--color-muted-foreground)" }}
-              >
+              <p className="text-xs text-center" style={{ color: "var(--color-muted-foreground)" }}>
                 Wrong method?{" "}
                 <button
                   onClick={() => setStep("amount")}
@@ -653,7 +552,6 @@ export function TopUpDialog({
               </p>
             )}
 
-            {/* Confirm button */}
             <Button
               disabled={loading}
               onClick={handleCheckout}

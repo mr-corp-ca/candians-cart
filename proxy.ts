@@ -42,6 +42,15 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL(home, request.url));
   if (pathname.startsWith("/immigration") && role !== "immigration")
     return NextResponse.redirect(new URL(home, request.url));
+  
+  // Gate unverified customers
+  if (
+    role === "customer" &&
+    !session.user.phoneNumberVerified &&
+    !pathname.startsWith("/verify-phone")
+  ) {
+    return NextResponse.redirect(new URL("/verify-phone", request.url));
+  }
 
   return NextResponse.next();
 }
