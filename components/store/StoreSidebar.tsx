@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  BadgeDollarSign,
   Banknote,
   BarChart,
   HandCoins,
@@ -34,10 +35,11 @@ const NAV_GROUPS = [
   {
     label: "Management",
     items: [
+      { href: "/store/categories", label: "Sales", icon: BadgeDollarSign },
       { href: "/store/orders", label: "Orders", icon: ShoppingCart },
       { href: "/store/products", label: "Products", icon: Package },
-      { href: "/store/subsidy-list", label: "Subsidy List", icon: List },
       { href: "/store/customers", label: "Customers", icon: Users2 },
+      { href: "/store/subsidy-list", label: "Subsidy List", icon: List },
     ],
   },
   {

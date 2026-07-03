@@ -1,13 +1,7 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Customer } from "@/types/customer/customer";
-import {
-  Edit,
-  QrCode,
-  MapPin,
-  CalendarDays,
-  X,
-} from "lucide-react";
+import { Edit, QrCode, MapPin, CalendarDays, X } from "lucide-react";
 import Link from "next/link";
 import {
   Dialog,
@@ -24,16 +18,26 @@ import ShareButton from "@/components/shared/share/ShareButton";
 import { IReferralCode } from "@/db/models/admin/referralCode.model";
 import logoIcon from "@/app/icon.jpg";
 import { QRCodeSVG } from "qrcode.react";
+import EmailVerificationBadge from "./EmailVerificationBadge";
 
 type Props = {
   customer: Pick<
     Customer,
-    "_id" | "name" | "email" | "address" | "city" | "province" | "createdAt"
+    | "_id"
+    | "name"
+    | "email"
+    | "emailVerified"
+    | "aptUnit"
+    | "address"
+    | "city"
+    | "province"
+    | "postalCode"
+    | "createdAt"
   >;
-  referralCode:IReferralCode|null
+  referralCode: IReferralCode | null;
 };
 
-export default function ProfileHero({ customer,referralCode }: Props) {
+export default function ProfileHero({ customer, referralCode }: Props) {
   const initials = customer.name
     .split(" ")
     .map((w) => w[0])
@@ -41,6 +45,22 @@ export default function ProfileHero({ customer,referralCode }: Props) {
     .toUpperCase()
     .slice(0, 2);
 
+  const streetAddress = customer.address?.trim();
+  const aptUnit = customer.aptUnit?.trim();
+
+  const streetAddressWithUnit =
+    aptUnit && streetAddress
+      ? `${aptUnit}-${streetAddress}`
+      : streetAddress || "";
+
+  const formattedAddress = [
+    streetAddressWithUnit,
+    customer.city,
+    customer.province,
+    customer.postalCode,
+  ]
+    .filter(Boolean)
+    .join(", ");
 
   return (
     <div className="rounded-3xl border border-border/60 bg-card overflow-hidden shadow-sm">
@@ -95,10 +115,19 @@ export default function ProfileHero({ customer,referralCode }: Props) {
           </h1>
           <p className="text-sm text-muted-foreground">{customer.email}</p>
 
+          <div className="mt-1.5">
+            <EmailVerificationBadge
+              email={customer.email}
+              verified={customer.emailVerified ?? false}
+            />
+          </div>
+
           <div className="flex flex-wrap items-center gap-3 pt-1">
-            <span className="flex items-center gap-1 text-xs text-muted-foreground">
+            <span className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
               <MapPin className="h-3 w-3 text-primary shrink-0" />
-              {customer.city}, {customer.province}
+              <span className="truncate">
+                {formattedAddress || "Address not set"}
+              </span>
             </span>
             <span className="w-1 h-1 rounded-full bg-border" />
             <span className="flex items-center gap-1 text-xs text-muted-foreground">
