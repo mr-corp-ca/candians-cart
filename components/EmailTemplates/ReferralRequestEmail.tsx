@@ -1,333 +1,210 @@
-import * as React from "react";
 import {
   Body,
-  Button,
   Container,
   Head,
   Heading,
   Html,
-  Link,
   Preview,
-  Section,
   Text,
-} from "@react-email/components";
+} from "@react-email/components"
+import { Tailwind } from "@react-email/tailwind"
 
-type ReferralRequestEmailProps = {
-  recipientName?: string | null;
-  requesterName: string;
-  manageRequestsUrl: string;
-  appName?: string;
-  supportEmail?: string;
-};
+interface ReferralRequestEmailProps {
+  recipientName?: string | null
+  requesterName: string
+  manageRequestsUrl: string
+  appName?: string
+  supportEmail?: string
+}
 
-export function ReferralRequestEmail({
+export default function ReferralRequestEmail({
   recipientName,
   requesterName,
   manageRequestsUrl,
   appName = "Candian's Cart",
   supportEmail = "info@canadianscart.ca",
 }: ReferralRequestEmailProps) {
+
   return (
-    <Html>
-      <Head />
-      <Preview>{requesterName} has requested a referral invite.</Preview>
+    <Tailwind>
+      <Html>
+        <Head />
+        <Preview>{requesterName} asked you for a referral on {appName}.</Preview>
 
-      <Body style={main}>
-        <Container style={container}>
-          <Section style={card}>
-            {/* Hero */}
-            <Section style={heroSection}>
-              <Heading style={heading}>New Referral Request 👋</Heading>
+        <Body style={{
+          backgroundColor: "#ecf0ec",
+          margin: 0,
+          padding: "40px 16px",
+          fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+        }}>
+          <Container style={{ maxWidth: "560px", margin: "0 auto" }}>
 
-              <Text style={heroText}>
-                Hi{recipientName ? ` ${recipientName}` : ""},
-              </Text>
+            {/* Card */}
+            <div style={{
+              backgroundColor: "#ffffff",
+              borderRadius: "20px",
+              border: "1px solid #e2e8f0",
+              boxShadow: "0 8px 32px rgba(0,0,0,0.08)",
+              overflow: "hidden",
+            }}>
 
-              <Text style={heroText}>
-                <strong style={{ color: "#1e4a36" }}>{requesterName}</strong>{" "}
-                has requested a referral invite for {appName}. Review their
-                request and decide whether you'd like to share your referral
-                code.
-              </Text>
+              {/* Top accent bar */}
+              <div style={{ background: "linear-gradient(90deg, #16a34a 0%, #22c55e 100%)", height: "4px" }} />
 
-              <Section style={buttonWrap}>
-                <Button href={manageRequestsUrl} style={button}>
-                  Review Request
-                </Button>
-              </Section>
+              {/* Hero */}
+              <div style={{ padding: "44px 44px 32px", textAlign: "center" }}>
 
-              <Text style={subtleText}>
-                If you approve the request, your referral code will be sent to{" "}
-                {requesterName} automatically.
-              </Text>
-            </Section>
+                {/* Icon circle */}
+                <table cellPadding={0} cellSpacing={0} style={{ margin: "0 auto 24px" }}>
+                  <tbody>
+                    <tr>
+                      <td style={{
+                        width: "64px",
+                        height: "64px",
+                        borderRadius: "16px",
+                        backgroundColor: "#f0fdf4",
+                        border: "1.5px solid #86efac",
+                        textAlign: "center",
+                        verticalAlign: "middle",
+                        fontSize: "30px",
+                        lineHeight: "64px",
+                      }}>
+                        🙋
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
 
-            <div style={divider} />
+                {/* Referral request badge */}
+                <table cellPadding={0} cellSpacing={0} style={{ margin: "0 auto 18px" }}>
+                  <tbody>
+                    <tr>
+                      <td style={{
+                        backgroundColor: "#f0fdf4",
+                        border: "1px solid #86efac",
+                        borderRadius: "999px",
+                        padding: "4px 14px",
+                      }}>
+                        <Text style={{ margin: 0, fontSize: "11px", fontWeight: "700", color: "#16a34a", letterSpacing: "0.1em", textTransform: "uppercase" }}>
+                          ✦ Referral Request
+                        </Text>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
 
-            {/* Info */}
-            <Section style={contentSection}>
-              <Text style={sectionLabel}>What happens next?</Text>
+                <Heading style={{
+                  fontSize: "26px",
+                  fontWeight: "800",
+                  color: "#0f172a",
+                  margin: "0 0 12px",
+                  letterSpacing: "-0.035em",
+                  lineHeight: "1.2",
+                }}>
+                  Hi{recipientName ? ` ${recipientName.split(" ")[0]}` : ""}, someone needs your help. 🤝
+                </Heading>
 
-              {[
-                {
-                  emoji: "📨",
-                  title: "Review the request",
-                  desc: "Open your referral dashboard to see the request.",
-                },
-                {
-                  emoji: "✅",
-                  title: "Accept or decline",
-                  desc: "You're in full control of who receives your referral code.",
-                },
-                {
-                  emoji: "🎁",
-                  title: "Share your referral",
-                  desc: "Accepted users automatically receive your referral code.",
-                },
-              ].map(({ emoji, title, desc }) => (
-                <Section key={title} style={perkRow}>
-                  <Text style={perkEmoji}>{emoji}</Text>
+                <Text style={{ fontSize: "14px", color: "#64748b", lineHeight: "1.8", margin: 0 }}>
+                  <span style={{ fontWeight: "700", color: "#111827" }}>{requesterName}</span>{" "}
+                  requested a referral from you on{" "}
+                  <span style={{ fontWeight: "700", color: "#111827" }}>{appName}</span>.
+                  You can accept or decline whenever you're ready.
+                </Text>
+              </div>
 
-                  <Section style={perkContent}>
-                    <Text style={perkTitle}>{title}</Text>
-                    <Text style={perkDesc}>{desc}</Text>
-                  </Section>
-                </Section>
-              ))}
-            </Section>
+              {/* Action block */}
+              <div style={{ padding: "0 44px 32px" }}>
+                <div style={{
+                  background: "linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)",
+                  border: "1.5px solid #86efac",
+                  borderRadius: "16px",
+                  padding: "28px 24px",
+                  textAlign: "center",
+                }}>
+                  <Text style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "0.12em", textTransform: "uppercase", color: "#16a34a", margin: "0 0 14px" }}>
+                    Review the request
+                  </Text>
 
-            <div style={divider} />
+                  <table cellPadding={0} cellSpacing={0} style={{ margin: "0 auto" }}>
+                    <tbody>
+                      <tr>
+                        <td style={{
+                          backgroundColor: "#16a34a",
+                          borderRadius: "10px",
+                        }}>
+                          <a
+                            href={manageRequestsUrl}
+                            style={{
+                              display: "inline-block",
+                              padding: "12px 28px",
+                              fontSize: "14px",
+                              fontWeight: "700",
+                              color: "#ffffff",
+                              textDecoration: "none",
+                            }}
+                          >
+                            Manage requests
+                          </a>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
 
-            {/* Fallback Link */}
-            <Section style={contentSection}>
-              <Text style={linkBoxLabel}>
-                Button not working? Copy this link into your browser:
-              </Text>
+              {/* Info banner */}
+              <div style={{ padding: "0 44px 32px" }}>
+                <div style={{
+                  backgroundColor: "#fffbeb",
+                  border: "1px solid #fcd34d",
+                  borderLeft: "4px solid #f59e0b",
+                  borderRadius: "12px",
+                  padding: "16px 18px",
+                }}>
+                  <table cellPadding={0} cellSpacing={0} style={{ width: "100%" }}>
+                    <tbody>
+                      <tr>
+                        <td style={{ width: "28px", verticalAlign: "top", paddingRight: "12px", fontSize: "18px", paddingTop: "1px" }}>ℹ️</td>
+                        <td>
+                          <Text style={{ fontSize: "13px", fontWeight: "700", color: "#92400e", margin: "0 0 3px" }}>
+                            No action needed if you'd rather not respond
+                          </Text>
+                          <Text style={{ fontSize: "12px", color: "#a16207", margin: 0, lineHeight: "1.6" }}>
+                            If you accept, your referral code will be sent to {requesterName} automatically.
+                          </Text>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
 
-              <Section style={linkBox}>
-                <Link href={manageRequestsUrl} style={linkText}>
-                  {manageRequestsUrl}
-                </Link>
-              </Section>
-            </Section>
+              {/* Divider */}
+              <div style={{ height: "1px", backgroundColor: "#f1f5f9", margin: "0 44px" }} />
 
-            <div style={divider} />
+              {/* Footer note */}
+              <div style={{ padding: "24px 44px 40px", textAlign: "center" }}>
+                <Text style={{ fontSize: "12px", color: "#94a3b8", margin: "0 0 4px", lineHeight: "1.7" }}>
+                  Questions? Reply to this email or write to{" "}
+                  <span style={{ color: "#64748b", fontWeight: "600" }}>{supportEmail}</span>.
+                </Text>
+              </div>
+
+            </div>
 
             {/* Footer */}
-            <Section style={footerSection}>
-              <Text style={supportText}>
-                Need help?{" "}
-                <Link href={`mailto:${supportEmail}`} style={footerLink}>
-                  {supportEmail}
-                </Link>
+            <div style={{ textAlign: "center", paddingTop: "24px" }}>
+              <Text style={{ fontSize: "11px", color: "#9ca3af", margin: "0 0 3px", lineHeight: "1.6" }}>
+                © {new Date().getFullYear()} {appName} · Invite-only family grocery platform
               </Text>
+              <Text style={{ fontSize: "11px", color: "#9ca3af", margin: 0 }}>
+                Abbotsford, BC · canadianscart.ca
+              </Text>
+            </div>
 
-              <Text style={copyright}>
-                © {new Date().getFullYear()} {appName}. All rights reserved.
-              </Text>
-            </Section>
-          </Section>
-        </Container>
-      </Body>
-    </Html>
-  );
+          </Container>
+        </Body>
+      </Html>
+    </Tailwind>
+  )
 }
-
-// ─── Styles ───────────────────────────────────────────────────────────────────
-
-const main: React.CSSProperties = {
-  backgroundColor: "#f3f8f4",
-  margin: 0,
-  padding: "40px 16px",
-  fontFamily:
-    'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-};
-
-const container: React.CSSProperties = {
-  maxWidth: "560px",
-  margin: "0 auto",
-};
-
-const card: React.CSSProperties = {
-  backgroundColor: "#ffffff",
-  border: "1px solid #dfece3",
-  borderRadius: "18px",
-  overflow: "hidden",
-  boxShadow: "0 8px 24px rgba(15, 23, 42, 0.06)",
-};
-
-const heroSection: React.CSSProperties = {
-  padding: "40px 36px 28px",
-  textAlign: "center",
-};
-
-const heading: React.CSSProperties = {
-  margin: "0 0 14px",
-  fontSize: "30px",
-  lineHeight: "1.2",
-  fontWeight: 800,
-  letterSpacing: "-0.03em",
-  color: "#1e4a36",
-};
-
-const heroText: React.CSSProperties = {
-  margin: "0 auto 24px",
-  maxWidth: "420px",
-  fontSize: "15px",
-  lineHeight: "1.8",
-  color: "#5d7064",
-};
-
-const codePillWrap: React.CSSProperties = {
-  margin: "0 auto 8px",
-};
-
-const codePillLabel: React.CSSProperties = {
-  margin: "0 0 8px",
-  fontSize: "11px",
-  fontWeight: 700,
-  letterSpacing: "0.12em",
-  textTransform: "uppercase",
-  color: "#91a598",
-};
-
-const codePill: React.CSSProperties = {
-  display: "inline-block",
-  margin: "0 auto",
-  padding: "10px 28px",
-  backgroundColor: "#eefbf1",
-  border: "1.5px dashed #4ade80",
-  borderRadius: "12px",
-  fontSize: "26px",
-  fontWeight: 800,
-  letterSpacing: "0.18em",
-  color: "#166534",
-  fontFamily: "monospace",
-};
-
-const buttonWrap: React.CSSProperties = {
-  margin: "24px 0 16px",
-};
-
-const button: React.CSSProperties = {
-  display: "inline-block",
-  backgroundColor: "#20a24a",
-  color: "#ffffff",
-  fontSize: "14px",
-  fontWeight: 700,
-  textDecoration: "none",
-  borderRadius: "10px",
-  padding: "13px 22px",
-};
-
-const subtleText: React.CSSProperties = {
-  margin: 0,
-  fontSize: "13px",
-  lineHeight: "1.7",
-  color: "#7a8f82",
-};
-
-const divider: React.CSSProperties = {
-  height: "1px",
-  backgroundColor: "#edf4ef",
-  margin: "0 36px",
-};
-
-const contentSection: React.CSSProperties = {
-  padding: "28px 36px",
-};
-
-const sectionLabel: React.CSSProperties = {
-  margin: "0 0 16px",
-  fontSize: "11px",
-  fontWeight: 700,
-  letterSpacing: "0.12em",
-  textTransform: "uppercase",
-  color: "#91a598",
-};
-
-const perkRow: React.CSSProperties = {
-  display: "flex",
-  alignItems: "flex-start",
-  gap: "12px",
-  marginBottom: "16px",
-};
-
-const perkEmoji: React.CSSProperties = {
-  margin: "0",
-  fontSize: "20px",
-  lineHeight: "1",
-  flexShrink: 0,
-  width: "28px",
-};
-
-const perkContent: React.CSSProperties = {
-  flex: 1,
-};
-
-const perkTitle: React.CSSProperties = {
-  margin: "0 0 2px",
-  fontSize: "13px",
-  fontWeight: 700,
-  color: "#1f3f31",
-};
-
-const perkDesc: React.CSSProperties = {
-  margin: 0,
-  fontSize: "12px",
-  lineHeight: "1.65",
-  color: "#697d71",
-};
-
-const linkBoxLabel: React.CSSProperties = {
-  margin: "0 0 10px",
-  fontSize: "12px",
-  color: "#698071",
-};
-
-const linkBox: React.CSSProperties = {
-  backgroundColor: "#f7fbf8",
-  border: "1px solid #dfece3",
-  borderLeft: "3px solid #20a24a",
-  borderRadius: "12px",
-  padding: "14px 16px",
-};
-
-const linkText: React.CSSProperties = {
-  fontSize: "13px",
-  lineHeight: "1.7",
-  color: "#1d7f44",
-  wordBreak: "break-all",
-  textDecoration: "underline",
-};
-
-const footerSection: React.CSSProperties = {
-  padding: "24px 36px 30px",
-  textAlign: "center",
-};
-
-const footerLinks: React.CSSProperties = {
-  margin: "0 0 10px",
-  fontSize: "13px",
-  lineHeight: "1.7",
-  color: "#6f8477",
-};
-
-const footerLink: React.CSSProperties = {
-  color: "#1d7f44",
-  textDecoration: "underline",
-};
-
-const supportText: React.CSSProperties = {
-  margin: "0 0 8px",
-  fontSize: "12px",
-  lineHeight: "1.7",
-  color: "#789084",
-};
-
-const copyright: React.CSSProperties = {
-  margin: 0,
-  fontSize: "11px",
-  lineHeight: "1.6",
-  color: "#97aa9e",
-};
